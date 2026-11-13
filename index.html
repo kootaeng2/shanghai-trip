@@ -13,9 +13,14 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 
+  <!-- 화면 테마(자동/라이트/다크): 화면이 그려지기 전에 먼저 적용해서 깜빡임 방지 -->
+  <script>
+    try { var t = localStorage.getItem("trip.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+
   <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
-  <link rel="stylesheet" href="style.css?v=7" />
-  <script type="module" src="app.js?v=7"></script>
+  <link rel="stylesheet" href="style.css?v=8" />
+  <script type="module" src="app.js?v=8"></script>
 </head>
 <body>
 
@@ -59,7 +64,10 @@
     <header class="hero">
       <div class="hero-top">
         <span id="syncChip" class="chip chip-glass">⏳ 연결 중…</span>
-        <button class="chip chip-glass" type="button" data-action="rename" id="whoami">👤 이름</button>
+        <div class="hero-actions">
+          <button class="chip chip-glass theme-btn" type="button" data-action="theme" id="themeBtn" aria-label="화면 테마 바꾸기">🌓 자동</button>
+          <button class="chip chip-glass" type="button" data-action="rename" id="whoami">👤 이름</button>
+        </div>
       </div>
       <h1 class="hero-title" data-bind="title">🇨🇳 상하이 가족여행</h1>
       <p id="tripDates" class="hero-dates"></p>

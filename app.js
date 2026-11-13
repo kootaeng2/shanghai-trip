@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=7";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=8";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -934,6 +934,7 @@ document.addEventListener("click", (e) => {
       goCheckPage(btn.dataset.page !== undefined ? Number(btn.dataset.page) : state.checkPage + Number(btn.dataset.dir));
       break;
     case "rename": askName(true); break;
+    case "theme": cycleTheme(); break;
     case "close-form": $("#formDialog").close(); break;
   }
 });
@@ -1040,6 +1041,33 @@ function onListenError(err) {
     showBanner("error", `⚠️ 데이터를 불러오지 못했어요: ${esc(err?.message || err)}`);
   }
 }
+
+/* ---------- 화면 테마: 자동(폰 설정 따라감) → 라이트 → 다크 순서로 바뀜 ---------- */
+const THEME_KEY = "trip.theme"; // index.html 머리의 작은 스크립트와 같은 키
+const THEMES = { auto: "🌓 자동", light: "☀️ 라이트", dark: "🌙 다크" };
+const THEME_COLOR = { light: "#c8102e", dark: "#1a1214" };
+function applyTheme(t) {
+  const root = document.documentElement;
+  if (t === "light" || t === "dark") root.dataset.theme = t;
+  else { delete root.dataset.theme; t = "auto"; }
+  // 폰 상단 상태바 색도 맞춰 줌 (자동이면 원래대로)
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+    const own = (m.media || "").includes("dark") ? THEME_COLOR.dark : THEME_COLOR.light;
+    m.content = t === "auto" ? own : THEME_COLOR[t];
+  });
+  const btn = $("#themeBtn");
+  if (btn) { btn.textContent = THEMES[t]; btn.setAttribute("aria-label", `화면 테마: ${THEMES[t].slice(2).trim()} (눌러서 바꾸기)`); }
+  return t;
+}
+function cycleTheme() {
+  const order = ["auto", "light", "dark"];
+  const cur = document.documentElement.dataset.theme || "auto";
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  applyTheme(next);
+  ls.set(THEME_KEY, next);
+  toast(`화면 테마: ${THEMES[next]}`);
+}
+applyTheme(ls.get(THEME_KEY));
 
 async function boot() {
   showScreen("app");
