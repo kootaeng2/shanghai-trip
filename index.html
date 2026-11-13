@@ -19,8 +19,8 @@
   </script>
 
   <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
-  <link rel="stylesheet" href="style.css?v=9" />
-  <script type="module" src="app.js?v=9"></script>
+  <link rel="stylesheet" href="style.css?v=10" />
+  <script type="module" src="app.js?v=10"></script>
 </head>
 <body>
 
@@ -79,6 +79,8 @@
       <nav class="tabbar" role="tablist" aria-label="화면 전환">
         <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="plan" aria-selected="true">🗓️ 일정</button>
         <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="places" aria-selected="false">🍜 맛집·할거리</button>
+        <!-- 통합 검색: 일정·맛집·항공·숙소·준비물·정보를 한 번에 찾기 (PC는 / 키로도 열림) -->
+        <button class="tab-btn search-btn" type="button" data-action="search" aria-label="검색" title="검색 ( / )">🔍</button>
       </nav>
       <nav class="quicknav" aria-label="섹션 바로가기">
         <a href="#sec-flights">✈️ 항공</a>
@@ -198,6 +200,19 @@
         <button class="btn btn-primary" type="submit">저장</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- ============ 🔍 검색창 (폰에서는 키보드에 가리지 않게 화면 위쪽에 붙음) ============ -->
+  <dialog id="searchDialog" class="sheet search-sheet" aria-label="검색">
+    <div class="sheet-inner">
+      <div class="search-head">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="searchInput" class="search-input" type="search" autocomplete="off" enterkeyhint="search"
+               placeholder="일정·맛집·준비물·정보 검색" aria-label="검색어" />
+        <button class="icon-btn" type="button" data-action="close-search" aria-label="닫기">✕</button>
+      </div>
+      <div id="searchResults" class="search-results" aria-live="polite"></div>
+    </div>
   </dialog>
 
   <!-- ============ 삭제 확인창 ============ -->

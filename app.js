@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=9";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=10";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -601,12 +601,12 @@ function updateCheckDots() {
   if (count) count.textContent = `${state.checkPage + 1} / ${dots.length}`;
 }
 
-function goCheckPage(page) {
+function goCheckPage(page, smooth = true) {
   const track = $("#checkTrack");
   if (!track) return;
   const max = track.children.length - 1;
   state.checkPage = Math.max(0, Math.min(max, page));
-  track.scrollTo({ left: track.children[state.checkPage].offsetLeft, behavior: "smooth" });
+  track.scrollTo({ left: track.children[state.checkPage].offsetLeft, behavior: smooth ? "smooth" : "auto" });
   updateCheckDots();
 }
 
@@ -1256,6 +1256,10 @@ document.addEventListener("click", (e) => {
     case "tab": setTab(btn.dataset.tab); break;
     case "vote": toggleVote(id); break;
     case "to-schedule": openScheduleForm(id); break;
+    case "search": openSearch(); break;
+    case "close-search": $("#searchDialog").close(); break;
+    case "search-suggest": $("#searchInput").value = btn.dataset.q; runSearch(); $("#searchInput").focus(); break;
+    case "search-go": goToResult(col, id); break;
     case "place-filter": {
       const { f, v } = btn.dataset;
       if (f === "reset") state.placeFilter = { district: "all", kind: "all", reserveOnly: false };
@@ -1319,6 +1323,169 @@ window.addEventListener("hashchange", () => {
   }
 });
 
+/* ---------- 🔍 통합 검색 ----------
+ *  - 탭 막대의 🔍 (PC는 / 또는 Ctrl+K) → 검색창
+ *  - 이미 받아 둔 state 안에서만 찾음 (서버에 따로 묻지 않아서 오프라인에서도 됨)
+ *  - 띄어쓰기로 나눈 단어가 모두 들어 있으면 결과. "남상만두"처럼 붙여 써도 찾음
+ *  - 결과를 누르면 해당 탭·날짜·페이지로 이동해서 카드를 잠깐 반짝여 줌 */
+const SEARCH_SECTIONS = {
+  events: "🗓️ 일정", places: "🍜 맛집·할거리", flights: "✈️ 항공편",
+  hotels: "🏨 숙소", checklist: "✅ 준비물", tips: "💡 정보",
+};
+const SEARCH_SUGGEST = ["예약", "와이탄", "디즈니", "여권", "알리페이", "공항"];
+const SEARCH_MAX = 30; // 한 구역에 보여줄 최대 결과 수
+const normText = (s) => String(s ?? "").toLowerCase();
+
+// 검색 대상 목록: { col, id, title, sub, texts(스니펫 후보), hay(찾을 글자) }
+function searchDocs() {
+  const docs = [];
+  const add = (col, it, title, sub, texts) => {
+    const all = normText([title, sub, ...texts].filter(Boolean).join(" "));
+    docs.push({ col, id: it.id, title, sub, texts: texts.filter(Boolean), hay: `${all} ${all.replace(/\s+/g, "")}` });
+  };
+  const days = tripDays();
+  [...state.events].sort((a, b) => `${a.date}${a.time || "99"}`.localeCompare(`${b.date}${b.time || "99"}`)).forEach((e) => {
+    const cat = CATEGORIES[e.category] || CATEGORIES.etc;
+    const n = days.indexOf(e.date);
+    add("events", e, e.title, [n >= 0 ? `Day ${n + 1}` : "", fmtMD(e.date), e.time, cat.label].filter(Boolean).join(" · "),
+      [e.place, e.memo, e.reserved ? "예약완료" : ""]);
+  });
+  [...state.places].sort((a, b) => votesOf(b).length - votesOf(a).length).forEach((p) => {
+    const d = DISTRICTS[p.district] || DISTRICTS.etc;
+    const k = KINDS[p.kind] || KINDS.etc;
+    const r = RESERVES[p.reserve] || RESERVES.none;
+    // '예약 불필요'는 빼야 "예약"으로 찾을 때 예약 안 해도 되는 곳까지 나오지 않음
+    add("places", p, p.name, [d.label, k.label, p.reserve !== "none" ? `${r.icon} ${r.label}` : ""].filter(Boolean).join(" · "),
+      [p.nameZh, p.reserveHow, p.priceNote, p.memo, votesOf(p).length ? `♥ ${votesOf(p).join(", ")}` : ""]);
+  });
+  state.flights.forEach((f) => {
+    const back = f.direction === "back";
+    add("flights", f, `${back ? "🛬 오는 편" : "🛫 가는 편"} ${[f.airline, f.flightNo].filter(Boolean).join(" ")}`,
+      [fmtMD(f.depDate), f.depTime, f.depAirport || f.arrAirport ? `${f.depAirport || "?"} → ${f.arrAirport || "?"}` : ""].filter(Boolean).join(" "),
+      [f.bookingRef && `예약번호 ${f.bookingRef}`, f.seat && `좌석 ${f.seat}`, f.memo, back ? "귀국" : "출국"]);
+  });
+  state.hotels.forEach((h) => add("hotels", h, h.name, `${fmtMD(h.checkInDate)} ~ ${fmtMD(h.checkOutDate)}`,
+    [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
+  state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
+  state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
+  return docs;
+}
+
+// 검색어 부분을 <mark>로 감싸기 (esc 먼저 하지 않고 조각마다 esc)
+function highlight(text, words) {
+  const s = String(text ?? "");
+  if (!words.length) return esc(s);
+  const re = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
+  return s.split(re).map((part, i) => (i % 2 ? `<mark>${esc(part)}</mark>` : esc(part))).join("");
+}
+// 제목에 없는 단어가 본문(메모 등)에 있으면 그 주변 글자만 잘라서 보여줌
+function snippet(doc, words) {
+  for (const t of doc.texts) {
+    const low = normText(t);
+    const at = Math.min(...words.map((w) => low.indexOf(w)).filter((i) => i >= 0));
+    if (!Number.isFinite(at)) continue;
+    const start = Math.max(0, at - 18);
+    const cut = t.replace(/\s+/g, " ").slice(start, start + 70);
+    return `${start ? "…" : ""}${highlight(cut, words)}${start + 70 < t.length ? "…" : ""}`;
+  }
+  return "";
+}
+
+function runSearch() {
+  const box = $("#searchResults");
+  const q = $("#searchInput").value.trim();
+  const words = normText(q).split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    box.innerHTML = `<p class="search-hint">일정·맛집·항공·숙소·준비물·정보를 한 번에 찾아요.</p>
+      <div class="search-suggest">${SEARCH_SUGGEST.map((w) =>
+        `<button class="fchip" type="button" data-action="search-suggest" data-q="${esc(w)}">${esc(w)}</button>`).join("")}</div>`;
+    return;
+  }
+  const hits = searchDocs().filter((d) => words.every((w) => d.hay.includes(w)));
+  if (!hits.length) {
+    box.innerHTML = `<p class="search-hint">"${esc(q)}"에 맞는 항목이 없어요 🥲<br><span class="small">단어를 줄이거나 다르게 써 보세요.</span></p>`;
+    return;
+  }
+  const groups = Object.keys(SEARCH_SECTIONS).map((col) => [col, hits.filter((h) => h.col === col)]).filter(([, l]) => l.length);
+  box.innerHTML = `<p class="search-count">${hits.length}개 찾았어요</p>` + groups.map(([col, list]) => `
+    <section class="search-group">
+      <h4>${SEARCH_SECTIONS[col]} <span>${list.length}</span></h4>
+      <ul>${list.slice(0, SEARCH_MAX).map((d) => {
+        const titleHit = words.some((w) => normText(d.title).includes(w));
+        const snip = titleHit ? "" : snippet(d, words);
+        return `<li><button class="search-item" type="button" data-action="search-go" data-col="${col}" data-id="${esc(d.id)}">
+          <b>${highlight(d.title, words)}</b>
+          ${d.sub ? `<small>${highlight(d.sub, words)}</small>` : ""}
+          ${snip ? `<span class="search-snip">${snip}</span>` : ""}
+        </button></li>`;
+      }).join("")}</ul>
+      ${list.length > SEARCH_MAX ? `<p class="small muted">외 ${list.length - SEARCH_MAX}개 — 검색어를 더 자세히 써 보세요</p>` : ""}
+    </section>`).join("");
+}
+
+function openSearch() {
+  const d = $("#searchDialog");
+  if (!d.open) d.showModal();
+  const input = $("#searchInput");
+  input.select();
+  input.focus();
+  runSearch();
+}
+
+// 결과 카드 찾기: 모든 카드에 있는 ✏️ 버튼(data-col + data-id)을 기준으로 찾음
+const findCard = (col, id) =>
+  document.querySelector(`[data-action="edit"][data-col="${col}"][data-id="${CSS.escape(id)}"]`)
+    ?.closest(".check-item, .tip, .card");
+
+function goToResult(col, id) {
+  $("#searchDialog").close();
+  setTab(col === "places" ? "places" : "plan");
+  if (col === "events") {
+    const ev = state.events.find((x) => x.id === id);
+    if (ev?.date) { state.day = ev.date; ls.set(LS_KEY.day, ev.date); renderSchedule(true); }
+  } else if (col === "tips") {
+    state.openTips.add(id);
+    renderTips();
+  } else if (col === "places") {
+    renderPlaces();
+    // 필터에 걸려 안 보이면 필터를 풀고 다시 그림
+    if (!findCard(col, id)) { state.placeFilter = { district: "all", kind: "all", reserveOnly: false }; renderPlaces(); }
+  }
+  const el = findCard(col, id);
+  if (!el) return toast("항목을 찾지 못했어요. 지워졌을 수 있어요");
+  if (col === "checklist") {
+    // 준비물은 가로로 넘기는 페이지: 해당 페이지로 넘긴 뒤 세로로만 스크롤
+    // (scrollIntoView를 쓰면 가로 페이지 넘김과 부딪혀서 직접 계산)
+    const page = [...$("#checkTrack").children].findIndex((p) => p.contains(el));
+    if (page >= 0) goCheckPage(page, false); // 부드럽게 넘기면 아래 세로 스크롤과 겹쳐 취소됨
+    const r = el.getBoundingClientRect();
+    window.scrollBy({ top: r.top - innerHeight / 2 + r.height / 2, behavior: "smooth" });
+  } else {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  el.classList.remove("flash");
+  void el.offsetWidth; // 애니메이션 다시 시작
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 2000);
+}
+
+$("#searchInput").addEventListener("input", runSearch);
+// 엔터 → 첫 번째 결과로 이동
+$("#searchInput").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.isComposing) return; // 한글 조합 중 엔터는 무시
+  e.preventDefault();
+  $("#searchResults .search-item")?.click();
+});
+// PC 단축키: / 또는 Ctrl(⌘)+K
+document.addEventListener("keydown", (e) => {
+  if ($("#app").hidden || document.querySelector("dialog[open]")) return;
+  const typing = e.target.closest?.("input, textarea, select, [contenteditable]");
+  if ((e.key === "/" && !typing) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k")) {
+    e.preventDefault();
+    openSearch();
+  }
+});
+
 // 체크리스트 체크 → 즉시 동기화
 document.addEventListener("change", (e) => {
   const cb = e.target.closest('input[data-action="toggle"]');
@@ -1355,7 +1522,7 @@ $("#entryForm").addEventListener("submit", (e) => {
   if (formCtx.col === "events" && data.date) { state.day = data.date; ls.set(LS_KEY.day, data.date); renderSchedule(true); }
 });
 // 모달 바깥(어두운 부분) 누르면 닫기
-for (const d of [$("#formDialog"), $("#confirmDialog")]) {
+for (const d of [$("#formDialog"), $("#confirmDialog"), $("#searchDialog")]) {
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
 }
 
@@ -1498,6 +1665,7 @@ async function boot() {
       state.loaded[col] = true;
       RENDER[col]();
       renderSampleButton();
+      if ($("#searchDialog").open) runSearch(); // 검색 중에 가족이 수정하면 결과도 갱신
       if (col === "events" && backend.mode === "firebase") {
         setSync(meta.fromCache ? "🟡 오프라인 · 저장된 내용 표시 중" : "🟢 실시간 동기화");
       }
