@@ -29,7 +29,7 @@ export const TRIP_CONFIG = {
   DEFAULT_EXCHANGE_RATE: 195,        // 1 CNY = 195원 (화면에서도 수정 가능)
   HOME_UTC_OFFSET: 9,                // 한국 UTC+9
   DEST_UTC_OFFSET: 8,                // 중국 UTC+8 → 비행시간 계산 시 시차 1시간 반영
-  mapUrl: (q) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+  mapUrl: (q) => `https://uri.amap.com/search?keyword=${encodeURIComponent(q)}&city=310000&callnative=1`, // 고덕지도
 };
 ```
 
@@ -214,7 +214,7 @@ git push -u origin main
 - Firebase(구글) 서버는 중국 본토 일반 와이파이/현지 유심에서 막혀 있어요.
 - **한국 통신사 로밍 또는 해외 eSIM**은 대부분 그대로 접속됩니다. 그래도 안 되면 VPN을 켜세요.
 - 이 사이트는 **오프라인 캐시**를 켜 두었어요. **출국 전 한국에서 한 번 열어 두면** 마지막 데이터가 폰에 저장돼서 연결이 끊겨도 내용을 볼 수 있습니다(상단 표시: 🟡 오프라인). 오프라인에서 수정한 내용은 다시 연결되면 자동으로 전송돼요.
-- 지도 링크는 구글맵이라 현지에서 안 될 수 있어요. `firebase-config.js`의 `mapUrl`을 고덕지도 예시로 바꿀 수 있습니다.
+- 장소·주소를 누르면 **고덕지도(Amap)**가 열려요(앱이 있으면 앱으로). 옆의 작은 "구글" 버튼은 한국에서 볼 때용이에요. 고덕지도는 중국어 이름·주소로 넣어야 정확히 찾아요.
 
 ### 6) 가족 코드를 바꿨는데 가족이 계속 들어와요 / 이름을 바꾸고 싶어요
 - 코드를 바꿔 배포하면 다음 접속 때 새 코드를 다시 물어봅니다(캐시 때문에 몇 분 걸릴 수 있음).

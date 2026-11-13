@@ -51,10 +51,15 @@ export const TRIP_CONFIG = {
   HOME_UTC_OFFSET: 9,
   DEST_UTC_OFFSET: 8,
 
-  // 장소·주소를 눌렀을 때 열 지도 링크.
-  // 중국 현지에선 구글맵이 VPN 없이 안 될 수 있어요. 바이두/고덕으로 바꾸려면 아래 주석 참고.
+  // 장소·주소를 눌렀을 때 열 지도 링크 (기본: 고덕지도)
+  // 중국에선 구글맵이 VPN 없이 안 되고 위치도 어긋나서 고덕지도(Amap)를 기본으로 씀.
+  //  - city=310000 : 상하이 지역 코드 → 상하이 안에서 검색
+  //  - callnative=1 : 폰에 고덕지도 앱이 있으면 앱으로 바로 열기
+  //  ※ 고덕지도는 중국어 이름·주소(예: 外滩, 上海市黄浦区...)로 넣어야 정확히 찾아요.
   mapUrl: (query) =>
+    `https://uri.amap.com/search?keyword=${encodeURIComponent(query)}&city=310000&callnative=1&src=family-trip`,
+
+  // 옆에 작게 붙는 보조 지도 링크 (한국에서 볼 때용). 필요 없으면 null 로 바꾸세요.
+  altMapUrl: (query) =>
     `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,
-  // 고덕지도(Amap) 예시:
-  // mapUrl: (query) => `https://uri.amap.com/search?keyword=${encodeURIComponent(query)}`,
 };

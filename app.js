@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=2";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=3";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -277,7 +277,14 @@ function byline(item) {
   return `<div class="byline">✍️ ${esc(item.author || "익명")}${edited}</div>`;
 }
 const memo = (text) => (text ? `<p class="memo">${esc(text)}</p>` : "");
-const mapLink = (q) => (q ? `<a class="map-link" href="${esc(C.mapUrl(q))}" target="_blank" rel="noopener">📍 ${esc(q)}</a>` : "");
+// 기본 지도(고덕) 링크 + 보조 지도(구글) 작은 링크
+const mapLink = (q) => {
+  if (!q) return "";
+  const alt = C.altMapUrl
+    ? ` <a class="map-alt" href="${esc(C.altMapUrl(q))}" target="_blank" rel="noopener" aria-label="구글 지도로 보기">구글</a>`
+    : "";
+  return `<div class="map-row"><a class="map-link" href="${esc(C.mapUrl(q))}" target="_blank" rel="noopener">📍 ${esc(q)}</a>${alt}</div>`;
+};
 const sampleBadge = (item) => (item.sample ? `<span class="badge badge-sample">샘플</span>` : "");
 
 // 정의 목록(예약번호 등). 값이 빈 줄은 생략, copy=true면 복사 버튼
@@ -374,7 +381,7 @@ function renderHotels() {
         ${actions("hotels", h.id)}
       </div>
       <h3 class="card-title">${esc(h.name)}</h3>
-      ${mapLink(h.address)}
+      ${mapLink(h.address || h.name)}
       <div class="stay">
         <div><small>체크인</small><b>${fmtMD(h.checkInDate) || "-"}</b> ${esc(h.checkInTime || "")}</div>
         <div><small>체크아웃</small><b>${fmtMD(h.checkOutDate) || "-"}</b> ${esc(h.checkOutTime || "")}</div>
