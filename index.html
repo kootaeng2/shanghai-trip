@@ -14,33 +14,42 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 
   <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
-  <link rel="stylesheet" href="style.css?v=5" />
-  <script type="module" src="app.js?v=5"></script>
+  <link rel="stylesheet" href="style.css?v=6" />
+  <script type="module" src="app.js?v=6"></script>
 </head>
 <body>
 
   <!-- ============ 1. 가족 코드 입력 화면 ============ -->
+  <!--  폰 화면 구성: 위쪽은 큰 제목 영역(gate-hero), 아래쪽은 화면 바닥에 붙은 입력 시트(gate-sheet)
+        → 키보드가 올라와도 입력칸이 가려지지 않고, 넓은 화면에서는 가운데 카드로 모임 -->
   <section id="gate" class="gate" hidden>
-    <form id="gateForm" class="gate-card" autocomplete="off">
-      <div class="gate-emoji">🏮</div>
+    <div class="gate-hero">
+      <div class="gate-emoji" aria-hidden="true">🏮</div>
       <h1 class="gate-title" data-bind="title">상하이 가족여행</h1>
-      <p class="gate-desc">가족 코드를 입력해 주세요</p>
-      <input id="gateInput" class="gate-input" type="password" inputmode="text" required
-             placeholder="가족 코드" aria-label="가족 코드" />
+      <p class="gate-sub" data-bind="dates"></p>
+      <span class="gate-dday" data-bind="dday"></span>
+    </div>
+    <form id="gateForm" class="gate-sheet" autocomplete="off">
+      <label class="gate-label" for="gateInput">🔒 가족 코드를 입력해 주세요</label>
+      <input id="gateInput" class="gate-input" type="password" required
+             placeholder="가족 코드" enterkeyhint="go" />
       <p id="gateError" class="gate-error" hidden>코드가 맞지 않아요. 다시 확인해 주세요.</p>
-      <button class="btn btn-primary btn-block" type="submit">입장하기</button>
+      <button class="btn btn-primary btn-block btn-lg" type="submit">입장하기</button>
     </form>
   </section>
 
   <!-- ============ 2. 이름 입력 화면 ============ -->
   <section id="nameGate" class="gate" hidden>
-    <form id="nameForm" class="gate-card" autocomplete="off">
-      <div class="gate-emoji">👋</div>
+    <div class="gate-hero">
+      <div class="gate-emoji" aria-hidden="true">👋</div>
       <h1 class="gate-title">누구세요?</h1>
-      <p class="gate-desc">일정을 추가하면 작성자로 이 이름이 기록돼요.</p>
+      <p class="gate-sub">일정을 추가하면 작성자로 이 이름이 기록돼요</p>
+    </div>
+    <form id="nameForm" class="gate-sheet" autocomplete="off">
+      <label class="gate-label" for="nameInput">이름 또는 호칭</label>
       <input id="nameInput" class="gate-input" type="text" maxlength="20" required
-             placeholder="예: 아빠, 엄마, 지민" aria-label="이름" />
-      <button class="btn btn-primary btn-block" type="submit">시작하기</button>
+             placeholder="예: 아빠, 엄마, 지민" enterkeyhint="done" />
+      <button class="btn btn-primary btn-block btn-lg" type="submit">시작하기</button>
       <button id="nameCancel" class="btn btn-ghost btn-block" type="button" hidden>취소</button>
     </form>
   </section>

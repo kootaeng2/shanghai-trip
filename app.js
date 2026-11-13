@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=5";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=6";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -301,17 +301,21 @@ function renderHeader() {
   document.querySelectorAll('[data-bind="title"]').forEach((el) => (el.textContent = C.TITLE));
   document.title = C.TITLE.replace(/^\S+\s/, ""); // 탭 제목은 이모지 제외
   const nights = daysBetween(C.START_DATE, C.END_DATE);
-  $("#tripDates").textContent = `${fmtFull(C.START_DATE)} ~ ${fmtFull(C.END_DATE)} · ${nights}박 ${nights + 1}일`;
+  const datesText = `${fmtFull(C.START_DATE)} ~ ${fmtFull(C.END_DATE)} · ${nights}박 ${nights + 1}일`;
+  $("#tripDates").textContent = datesText;
+  document.querySelectorAll('[data-bind="dates"]').forEach((el) => (el.textContent = datesText));
 
   const today = todayYMD();
   const toStart = daysBetween(today, C.START_DATE);
   const toEnd = daysBetween(today, C.END_DATE);
-  let html;
-  if (toStart > 0) html = `<strong>D-${toStart}</strong><span>출발까지 ${toStart}일 남았어요 ✈️</span>`;
-  else if (toStart === 0) html = `<strong>D-DAY</strong><span>오늘 출발! 여권 챙기셨죠? 🛂</span>`;
-  else if (toEnd >= 0) html = `<strong>Day ${-toStart + 1}</strong><span>여행 ${-toStart + 1}일차 즐기는 중 🎉</span>`;
-  else html = `<strong>완료</strong><span>즐거운 추억 가득했길 바라요 📸</span>`;
-  $("#dday").innerHTML = html;
+  let big, msg;
+  if (toStart > 0) [big, msg] = [`D-${toStart}`, `출발까지 ${toStart}일 남았어요 ✈️`];
+  else if (toStart === 0) [big, msg] = ["D-DAY", "오늘 출발! 여권 챙기셨죠? 🛂"];
+  else if (toEnd >= 0) [big, msg] = [`Day ${-toStart + 1}`, `여행 ${-toStart + 1}일차 즐기는 중 🎉`];
+  else [big, msg] = ["완료", "즐거운 추억 가득했길 바라요 📸"];
+  $("#dday").innerHTML = `<strong>${big}</strong><span>${msg}</span>`;
+  // 입장 화면의 작은 D-Day 배지
+  document.querySelectorAll('[data-bind="dday"]').forEach((el) => (el.textContent = toStart > 0 ? `${big} · 출발까지 ${toStart}일` : msg));
   // 출발 전에는 '준비물 체크리스트'를 맨 위로 (style.css의 .pre-trip 참고)
   document.body.classList.toggle("pre-trip", toStart > 0);
   $("#whoami").textContent = `👤 ${me()}`;
@@ -986,13 +990,20 @@ window.addEventListener("offline", () => booted && setSync("🟡 오프라인 ·
 // ---------- 화면 전환 ----------
 function showScreen(name) {
   ["gate", "nameGate", "app"].forEach((id) => ($("#" + id).hidden = id !== name));
+  window.scrollTo(0, 0);
 }
+
+// 폰(터치)에서는 자동 포커스를 하지 않음 → 화면이 열리자마자 키보드가 올라와 제목을 가리는 걸 방지
+const focusIfDesktop = (el) => { if (matchMedia("(pointer: fine)").matches) el.focus(); };
+
+// 가족 코드가 숫자로만 되어 있으면 폰에서 숫자 키패드가 뜨게
+if (/^\d+$/.test(String(C.FAMILY_CODE))) $("#gateInput").setAttribute("inputmode", "numeric");
 
 function askName(isRename = false) {
   $("#nameInput").value = isRename ? me() : "";
   $("#nameCancel").hidden = !isRename;
   showScreen("nameGate");
-  $("#nameInput").focus();
+  focusIfDesktop($("#nameInput"));
 }
 
 $("#gateForm").addEventListener("submit", (e) => {
@@ -1075,7 +1086,7 @@ async function boot() {
 function start() {
   if (ls.get(LS_KEY.code) !== String(C.FAMILY_CODE)) {
     showScreen("gate");
-    $("#gateInput").focus();
+    focusIfDesktop($("#gateInput"));
     return;
   }
   if (!ls.get(LS_KEY.name)) return askName(false);

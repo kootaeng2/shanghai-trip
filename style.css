@@ -114,27 +114,64 @@ main.container { display: flex; flex-direction: column; }
 button.chip { cursor: pointer; }
 
 /* ---------- 가족코드 / 이름 화면 ---------- */
+/* 폰: 위 = 제목 영역(남는 높이 전부), 아래 = 바닥에 붙은 입력 시트 */
 .gate {
-  min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px;
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column;
+  color: #fff;
   background:
-    radial-gradient(circle at 20% 10%, rgba(231, 192, 79, .35), transparent 40%),
-    linear-gradient(160deg, var(--hero-1), var(--hero-2));
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 214, 102, .35), transparent 60%),
+    radial-gradient(80% 50% at 100% 100%, rgba(255, 214, 102, .12), transparent 60%),
+    linear-gradient(170deg, var(--hero-1), var(--hero-2));
 }
-.gate-card {
-  width: 100%; max-width: 380px; background: var(--surface);
-  border-radius: 24px; padding: 32px 24px 24px; text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+.gate-hero {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: calc(40px + env(safe-area-inset-top)) 24px 36px; text-align: center;
+}
+.gate-emoji {
+  font-size: 84px; line-height: 1; margin-bottom: 6px;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, .3));
+  animation: sway 3.2s ease-in-out infinite; transform-origin: 50% 0;
+}
+@keyframes sway { 50% { transform: rotate(5deg); } }
+.gate-title { font-size: clamp(28px, 8.5vw, 38px); font-weight: 900; letter-spacing: -.03em; }
+.gate-sub { margin: 0; font-size: 15px; opacity: .88; }
+.gate-dday:empty { display: none; }
+.gate-dday {
+  margin-top: 6px; padding: 7px 16px; border-radius: 999px;
+  font-weight: 800; font-size: 15px; color: #ffe08a;
+  background: rgba(255, 224, 138, .14); border: 1px solid rgba(255, 224, 138, .4);
+}
+.gate-sheet {
   display: grid; gap: 12px;
+  background: var(--surface); color: var(--text);
+  border-radius: 28px 28px 0 0;
+  padding: 26px 20px calc(22px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, .22);
 }
-.gate-emoji { font-size: 48px; line-height: 1; }
-.gate-title { font-size: 22px; }
-.gate-desc { margin: 0 0 4px; color: var(--muted); }
+.gate-label { font-size: 15px; font-weight: 700; color: var(--muted); }
 .gate-input {
-  min-height: 54px; border-radius: 14px; border: 1.5px solid var(--line);
-  background: var(--surface-2); padding: 0 16px; font-size: 18px; text-align: center;
+  min-height: 58px; border-radius: 16px; border: 1.5px solid var(--line);
+  background: var(--surface-2); padding: 0 16px; font-size: 20px; text-align: center; letter-spacing: .08em;
 }
-.gate-input:focus { outline: none; border-color: var(--gold); }
-.gate-error { margin: 0; color: var(--red); font-size: 14px; }
+.gate-input::placeholder { letter-spacing: 0; font-size: 17px; }
+.gate-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 25%, transparent); }
+.gate-error { margin: 0; color: var(--red); font-size: 14px; text-align: center; }
+.btn-lg { min-height: 56px; font-size: 17px; border-radius: 16px; }
+
+/* 키가 작은 폰(가로 모드 등): 제목 영역을 줄임 */
+@media (max-height: 560px) {
+  .gate-hero { padding-top: calc(20px + env(safe-area-inset-top)); padding-bottom: 20px; gap: 6px; }
+  .gate-emoji { font-size: 48px; }
+  .gate-dday { display: none; }
+}
+/* 태블릿·PC: 가운데에 하나의 카드처럼 모아서 표시 */
+@media (min-width: 640px) {
+  .gate { align-items: center; justify-content: center; padding: 40px 16px; }
+  .gate-hero { flex: none; padding: 0 0 28px; }
+  .gate-sheet { width: 100%; max-width: 400px; border-radius: 24px; padding-bottom: 22px; }
+}
 .shake { animation: shake .35s; }
 @keyframes shake { 25% { transform: translateX(-8px); } 50% { transform: translateX(8px); } 75% { transform: translateX(-4px); } }
 
