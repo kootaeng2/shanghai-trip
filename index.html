@@ -19,8 +19,8 @@
   </script>
 
   <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
-  <link rel="stylesheet" href="style.css?v=8" />
-  <script type="module" src="app.js?v=8"></script>
+  <link rel="stylesheet" href="style.css?v=9" />
+  <script type="module" src="app.js?v=9"></script>
 </head>
 <body>
 
@@ -74,18 +74,41 @@
       <div id="dday" class="dday"></div>
     </header>
 
-    <nav class="quicknav" aria-label="섹션 바로가기">
-      <a href="#sec-flights">✈️ 항공</a>
-      <a href="#sec-hotels">🏨 숙소</a>
-      <a href="#sec-schedule">🗓️ 일정</a>
-      <a href="#sec-checklist">✅ 준비물</a>
-      <a href="#sec-budget">💰 예산</a>
-      <a href="#sec-tips">💡 정보</a>
-    </nav>
+    <!-- 스크롤해도 위에 붙어 있는 막대: 탭 전환 + (일정 탭에서만) 섹션 바로가기 -->
+    <div class="topbar">
+      <nav class="tabbar" role="tablist" aria-label="화면 전환">
+        <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="plan" aria-selected="true">🗓️ 일정</button>
+        <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="places" aria-selected="false">🍜 맛집·할거리</button>
+      </nav>
+      <nav class="quicknav" aria-label="섹션 바로가기">
+        <a href="#sec-flights">✈️ 항공</a>
+        <a href="#sec-hotels">🏨 숙소</a>
+        <a href="#sec-schedule">🗓️ 일정</a>
+        <a href="#sec-checklist">✅ 준비물</a>
+        <a href="#sec-budget">💰 예산</a>
+        <a href="#sec-tips">💡 정보</a>
+      </nav>
+    </div>
 
     <div id="banner" class="banner" hidden></div>
 
-    <main class="container">
+    <!-- ============ 탭 2: 맛집·할거리 (주소 끝에 #places 를 붙이면 바로 열림) ============ -->
+    <main id="tab-places" class="container" hidden>
+      <section id="sec-places" class="section">
+        <div class="section-head">
+          <h2>🍜 맛집·할거리 후보</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="places">＋ 추가</button>
+        </div>
+        <p class="places-intro muted small">가고 싶은 곳에 ♥를 눌러 고르고, <b>📅 일정에 추가</b>로 날짜를 정해 옮겨요.</p>
+        <div id="placeAlert"></div>
+        <div id="placeFilters" class="place-filters"></div>
+        <div id="list-places"></div>
+      </section>
+      <footer class="foot muted small">영업시간·가격은 바뀔 수 있어요. 출발 전 따종디엔핑·공식 안내로 다시 확인해 주세요 🙏</footer>
+    </main>
+
+    <!-- ============ 탭 1: 일정 ============ -->
+    <main id="tab-plan" class="container">
 
       <!-- 항공편 -->
       <section id="sec-flights" class="section">

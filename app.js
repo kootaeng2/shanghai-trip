@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=8";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=9";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -27,6 +27,7 @@ const LS_KEY = {
   code: `trip:${C.TRIP_ID}:familyCode`, // 맞게 입력한 가족 코드
   name: "trip:userName",                // 내 이름(작성자)
   day: `trip:${C.TRIP_ID}:selectedDay`, // 마지막으로 본 Day 탭
+  tab: `trip:${C.TRIP_ID}:tab`,         // 마지막으로 본 화면 탭 (plan / places)
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -71,6 +72,35 @@ const CATEGORIES = {
   rest:  { label: "휴식", icon: "☕", color: "#1f9d6b" },
   etc:   { label: "기타", icon: "📌", color: "#8a7f76" },
 };
+
+// --- 맛집·할거리(places) 분류 ---
+// ※ 키는 firestore.rules 의 validPlace 에서도 검사하므로 바꾸면 rules도 같이 수정
+const DISTRICTS = {
+  wai:       { label: "와이탄·난징동루", icon: "🌃" },
+  yuyuan:    { label: "예원·청황묘", icon: "🏮" },
+  people:    { label: "인민광장", icon: "🏛️" },
+  xintiandi: { label: "신천지·우캉루·푸시", icon: "🌳" },
+  lujiazui:  { label: "루자쭈이·푸동", icon: "🏙️" },
+  disney:    { label: "디즈니", icon: "🏰" },
+  etc:       { label: "기타 지역", icon: "📍" },
+};
+const KINDS = {
+  food:  { label: "식당", icon: "🍜" },
+  cafe:  { label: "카페", icon: "☕" },
+  sight: { label: "관광", icon: "🏯" },
+  shop:  { label: "쇼핑", icon: "🛍️" },
+  etc:   { label: "기타", icon: "📌" },
+};
+// rank: 같은 ♥ 수일 때 예약 급한 곳이 위로
+const RESERVES = {
+  must:        { label: "예약 필수", icon: "🔴", rank: 0 },
+  recommended: { label: "예약 권장", icon: "🟠", rank: 1 },
+  queue:       { label: "현장 대기", icon: "⏳", rank: 2 },
+  none:        { label: "예약 불필요", icon: "🟢", rank: 3 },
+};
+// 맛집 종류 → 일정 카테고리 (📅 일정에 추가할 때 사용)
+const KIND_TO_CAT = { food: "food", cafe: "food", sight: "sight", shop: "shop", etc: "etc" };
+const MAX_VOTES = 20; // rules 의 votes.size() <= 20 과 같은 값
 
 /*
  * 섹션별 입력 폼 정의
@@ -143,16 +173,37 @@ const SCHEMAS = {
       { k: "body", label: "내용", type: "textarea", max: 3000, rows: 8 },
     ],
   },
+  // ⚠️ 여기 필드 + votes + 공통 메타(author 등)가 firestore.rules validPlace 의 hasOnly 목록과 정확히 같아야 함
+  places: {
+    title: "맛집·할거리",
+    fields: [
+      { k: "name", label: "이름 (한글)", max: 100, required: true, placeholder: "예상하이 북경오리" },
+      { k: "nameZh", label: "중국어 이름 (고덕지도 검색용)", max: 50, placeholder: "夜上海" },
+      { k: "district", label: "지역", type: "select", half: true, required: true,
+        options: Object.entries(DISTRICTS).map(([k, d]) => [k, `${d.icon} ${d.label}`]) },
+      { k: "kind", label: "종류", type: "select", half: true, required: true,
+        options: Object.entries(KINDS).map(([k, d]) => [k, `${d.icon} ${d.label}`]) },
+      { k: "reserve", label: "예약", type: "select", required: true,
+        options: Object.entries(RESERVES).map(([k, r]) => [k, `${r.icon} ${r.label}`]) },
+      { k: "reserveHow", label: "예약 방법", max: 100, placeholder: "따종디엔핑 订座 / 공식 앱 / Trip.com 사전 예매" },
+      { k: "priceNote", label: "가격대·예산 메모", max: 60, half: true, placeholder: "1인 150위안 안팎" },
+      { k: "checkedAt", label: "정보 확인일", type: "date", half: true },
+      { k: "memo", label: "메모", type: "textarea", max: 500, placeholder: "토·일 혼잡, 휴무일, 추천 메뉴 등" },
+    ],
+    hint: "중국어 이름을 넣으면 📍 지도 링크가 고덕지도에서 정확히 찾아요. ♥ 투표는 카드에서 눌러요.",
+    defaults: () => ({ district: state.placeFilter.district !== "all" ? state.placeFilter.district : "wai",
+      kind: "food", reserve: "none", checkedAt: todayYMD() }),
+  },
 };
 
-const COLS = ["flights", "hotels", "events", "checklist", "tips"];
+const COLS = ["flights", "hotels", "events", "checklist", "tips", "places"];
 const CHECK_PER_PAGE = 6; // 준비물 슬라이드 한 페이지에 보여줄 개수
 
 /* =====================================================================
  * 3. 저장소(백엔드)
  *    화면 코드는 아래 인터페이스만 사용합니다.
  *    subscribe(col, cb) / subscribeSettings(cb) / add / set / update / remove
- *    addMany / removeMany / saveSettings / now()
+ *    listToggle / addMany / removeMany / saveSettings / now()
  * ===================================================================== */
 
 // 3-1. Firebase Firestore (실제 공유 모드)
@@ -198,6 +249,9 @@ async function createFirebaseBackend() {
     set: (col, id, data) => fs.setDoc(docRef(col, id), data),
     update: (col, id, patch) => fs.updateDoc(docRef(col, id), patch),
     remove: (col, id) => fs.deleteDoc(docRef(col, id)),
+    // 배열 필드에 값 넣기/빼기 (♥ 투표). arrayUnion/arrayRemove 라서 두 사람이 동시에 눌러도 안 덮어씀
+    listToggle: (col, id, field, value, on) =>
+      fs.updateDoc(docRef(col, id), { [field]: on ? fs.arrayUnion(value) : fs.arrayRemove(value) }),
     async addMany(list) { // [[col, data], ...] 한 번에 쓰기
       const batch = fs.writeBatch(db);
       list.forEach(([col, data]) => batch.set(fs.doc(colRef(col)), data));
@@ -233,6 +287,11 @@ function createLocalBackend() {
     set: (col, id, data) => write(col, (c) => { c[id] = data; }),
     update: (col, id, patch) => write(col, (c) => { c[id] = { ...c[id], ...patch }; }),
     remove: (col, id) => write(col, (c) => { delete c[id]; }),
+    listToggle: (col, id, field, value, on) => write(col, (c) => {
+      if (!c[id]) return;
+      const cur = (Array.isArray(c[id][field]) ? c[id][field] : []).filter((x) => x !== value);
+      c[id] = { ...c[id], [field]: on ? [...cur, value] : cur };
+    }),
     async addMany(items) { for (const [col, d] of items) await api.add(col, d); },
     async removeMany(items) { for (const [col, id] of items) await api.remove(col, id); },
     saveSettings: (data) => { db.settings = { ...(db.settings || {}), ...data }; persist(); queueMicrotask(() => emit("settings")); return Promise.resolve(); },
@@ -249,8 +308,10 @@ async function createBackend() {
  * 4. 상태 & 화면 그리기
  * ===================================================================== */
 const state = {
-  flights: [], hotels: [], events: [], checklist: [], tips: [],
+  flights: [], hotels: [], events: [], checklist: [], tips: [], places: [],
   settings: {},
+  tab: "plan",         // 화면 탭: plan(일정) / places(맛집·할거리)
+  placeFilter: { district: "all", kind: "all", reserveOnly: false },
   loaded: {},          // 컬렉션별 첫 데이터 도착 여부 (스켈레톤 표시용)
   day: ls.get(LS_KEY.day),
   openTips: new Set(), // 펼쳐 둔 팁 (다시 그려도 유지)
@@ -604,6 +665,114 @@ function renderTips() {
     </details>`).join("");
 }
 
+// ---------- 맛집·할거리 ----------
+const votesOf = (p) => (Array.isArray(p.votes) ? p.votes : []);
+// 여행 기간 중 토·일 날짜 (혼잡 안내용)
+const weekendDays = () => tripDays().filter((d) => [0, 6].includes(parseYMD(d).getDay()));
+// 이 장소가 이미 일정에 들어가 있는지 (제목이 같은 일정)
+const scheduledOf = (p) => state.events.filter((e) => e.title === p.name).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+
+function placeChip(f, v, label, count) {
+  const active = state.placeFilter[f] === v;
+  return `<button class="fchip ${active ? "active" : ""}" type="button" aria-pressed="${active}"
+    data-action="place-filter" data-f="${f}" data-v="${v}">${label}${count !== undefined ? ` <span>${count}</span>` : ""}</button>`;
+}
+
+function renderPlaces() {
+  const el = $("#list-places");
+  const filtersEl = $("#placeFilters");
+  const alertEl = $("#placeAlert");
+  if (!state.loaded.places) { filtersEl.innerHTML = ""; alertEl.innerHTML = ""; return (el.innerHTML = skeleton(3)); }
+  if (state.placesDenied) { // 새 보안 규칙(places)을 아직 게시하지 않은 경우
+    filtersEl.innerHTML = ""; alertEl.innerHTML = "";
+    return (el.innerHTML = emptyBox("🔒", "맛집 탭 저장 권한이 아직 없어요",
+      "Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules 전체를 붙여넣고 '게시'한 뒤 새로고침해 주세요."));
+  }
+  if (!state.places.length) {
+    filtersEl.innerHTML = ""; alertEl.innerHTML = "";
+    return (el.innerHTML = emptyBox("🍜", "아직 후보가 없어요",
+      "와이탄·예원·신천지·디즈니 등 가족여행 인기 맛집·명소를 예약 정보와 함께 한 번에 넣을 수 있어요.",
+      `<button class="btn btn-gold" type="button" data-action="seed" data-col="places">기본 맛집·할거리 넣기</button>`));
+  }
+
+  // 주말 혼잡 + 예약 필요 요약 (누르면 '예약 필요한 곳만' 켜짐)
+  const must = state.places.filter((p) => p.reserve === "must").length;
+  const rec = state.places.filter((p) => p.reserve === "recommended").length;
+  const wk = weekendDays();
+  alertEl.innerHTML = must + rec ? `<button class="place-alert" type="button" data-action="place-filter" data-f="reserveOnly" data-v="1">
+      <b>🔴 예약 필수 ${must}곳 · 🟠 권장 ${rec}곳</b>
+      <span>${wk.length ? `${wk.map(fmtMD).join("·")}은 인기 식당·명소가 붐벼요. 미리 예약해 두세요!` : "인기 장소는 미리 예약해 두세요!"}</span>
+    </button>` : "";
+
+  // 필터 칩: 지역(개수 표시) / 종류 / 예약 필요한 곳만
+  const f = state.placeFilter;
+  const countBy = (k, v) => state.places.filter((p) => (p[k] || "etc") === v).length;
+  filtersEl.innerHTML = `
+    <div class="fchips" role="group" aria-label="지역">${placeChip("district", "all", "전체", state.places.length)}${
+      Object.entries(DISTRICTS).filter(([k]) => countBy("district", k) || f.district === k)
+        .map(([k, d]) => placeChip("district", k, `${d.icon} ${d.label}`, countBy("district", k))).join("")}</div>
+    <div class="fchips" role="group" aria-label="종류">${placeChip("kind", "all", "모든 종류")}${
+      Object.entries(KINDS).map(([k, d]) => placeChip("kind", k, `${d.icon} ${d.label}`)).join("")}
+      <button class="fchip fchip-toggle ${f.reserveOnly ? "active" : ""}" type="button" aria-pressed="${f.reserveOnly}"
+        data-action="place-filter" data-f="reserveOnly" data-v="${f.reserveOnly ? "0" : "1"}">🔴 예약 필요한 곳만</button>
+    </div>`;
+
+  const list = state.places.filter((p) =>
+    (f.district === "all" || (p.district || "etc") === f.district) &&
+    (f.kind === "all" || (p.kind || "etc") === f.kind) &&
+    (!f.reserveOnly || p.reserve === "must" || p.reserve === "recommended"));
+
+  if (!list.length) {
+    return (el.innerHTML = emptyBox("🔍", "조건에 맞는 곳이 없어요", "필터를 바꾸거나 ＋ 추가로 새 후보를 넣어 주세요.",
+      `<button class="btn btn-ghost" type="button" data-action="place-filter" data-f="reset">필터 초기화</button>`));
+  }
+
+  // 정렬: ♥ 많은 순 → 예약 급한 순 → 먼저 등록한 순
+  const sorted = [...list].sort((a, b) =>
+    votesOf(b).length - votesOf(a).length ||
+    (RESERVES[a.reserve]?.rank ?? 9) - (RESERVES[b.reserve]?.rank ?? 9) ||
+    tsVal(a.createdAt) - tsVal(b.createdAt));
+
+  // 지역별로 묶어서 표시 (DISTRICTS 순서)
+  el.innerHTML = Object.entries(DISTRICTS).map(([dk, d]) => {
+    const group = sorted.filter((p) => (DISTRICTS[p.district] ? p.district : "etc") === dk);
+    if (!group.length) return "";
+    return `<section class="place-group">
+      <h3 class="place-group-title">${d.icon} ${d.label} <span>${group.length}</span></h3>
+      <div class="stack">${group.map(placeCard).join("")}</div>
+    </section>`;
+  }).join("");
+}
+
+function placeCard(p) {
+  const kind = KINDS[p.kind] || KINDS.etc;
+  const rsv = RESERVES[p.reserve] || RESERVES.none;
+  const votes = votesOf(p);
+  const mine = votes.includes(me());
+  const sched = scheduledOf(p);
+  return `<article class="card place-card rsv-${esc(p.reserve || "none")}">
+    <div class="card-head">
+      <span class="cat-chip">${kind.icon} ${kind.label}</span>
+      <span class="badge rsv-badge rsv-${esc(p.reserve || "none")}">${rsv.icon} ${rsv.label}</span>
+      ${sched.length ? `<span class="badge badge-ok">📅 ${sched.map((e) => fmtMD(e.date)).join(", ")}</span>` : ""}
+      ${sampleBadge(p)}
+      ${actions("places", p.id)}
+    </div>
+    <h3 class="card-title">${esc(p.name)}</h3>
+    ${p.nameZh ? `<p class="name-zh" lang="zh-CN">${esc(p.nameZh)}</p>` : ""}
+    ${mapLink(p.nameZh || p.name)}
+    ${metaList([["예약 방법", p.reserveHow], ["가격", p.priceNote], ["정보 확인", p.checkedAt ? fmtFull(p.checkedAt) : ""]])}
+    ${memo(p.memo)}
+    <div class="place-foot">
+      <button class="vote-btn ${mine ? "on" : ""}" type="button" data-action="vote" data-id="${esc(p.id)}" aria-pressed="${mine}"
+        aria-label="가고 싶어요 ${votes.length}명">${mine ? "♥" : "♡"} <b>${votes.length}</b></button>
+      <span class="voters">${votes.length ? esc(votes.join(", ")) : "가고 싶으면 ♥"}</span>
+      <button class="btn btn-sched" type="button" data-action="to-schedule" data-id="${esc(p.id)}">📅 일정에 추가</button>
+    </div>
+    ${byline(p)}
+  </article>`;
+}
+
 function renderSampleButton() {
   const hasSample = COLS.some((c) => state[c].some((x) => x.sample));
   $("#clearSampleBtn").hidden = !hasSample;
@@ -612,9 +781,10 @@ function renderSampleButton() {
 const RENDER = {
   flights: renderFlights,
   hotels: renderHotels,
-  events: () => { renderSchedule(); renderBudget(); },
+  events: () => { renderSchedule(); renderBudget(); renderPlaces(); }, // 맛집 카드의 '📅 일정에 있음' 표시도 갱신
   checklist: renderChecklist,
   tips: renderTips,
+  places: renderPlaces,
 };
 function renderAll() {
   renderHeader();
@@ -671,16 +841,17 @@ function openForm(col, id = null) {
   $("#formFields").innerHTML = schema.fields.map((f) => fieldHTML(f, values[f.k])).join("") +
     (schema.hint ? `<p class="field muted small" style="margin:0">${schema.hint}</p>` : "");
   formCtx = { col, id };
+  $("#entryForm [type=submit]").textContent = "저장";
   $("#formDialog").showModal();
   $("#formFields").scrollTop = 0;
 }
 
 // 폼 값 읽기 + 간단한 검증 (필수값 누락 시 null)
-function collectForm(col) {
+function collectForm(col, fields = SCHEMAS[col].fields) {
   const form = $("#entryForm");
   const out = {};
   let firstInvalid = null;
-  for (const f of SCHEMAS[col].fields) {
+  for (const f of fields) {
     const el = form.elements.namedItem(f.k);
     el.classList.remove("invalid");
     if (f.type === "checkbox") { out[f.k] = el.checked; continue; }
@@ -706,6 +877,7 @@ function saveEntry(col, id, data) {
     const keep = {};
     if (old.order !== undefined) keep.order = old.order;           // 체크리스트·팁 순서 유지
     if (old.done !== undefined && col === "checklist") keep.done = old.done;
+    if (col === "places") keep.votes = votesOf(old);                 // ♥ 투표 유지
     // sample 플래그는 일부러 빼서, 수정한 샘플은 "진짜 일정"이 되게 함
     job = backend.set(col, id, {
       ...keep, ...data,
@@ -719,10 +891,100 @@ function saveEntry(col, id, data) {
       extra.order = Math.max(0, ...state[col].map((x) => x.order ?? 0)) + 1;
     }
     if (col === "checklist") extra.done = false;
+    if (col === "places") extra.votes = [];
     job = backend.add(col, { ...data, ...extra, author: me(), updatedBy: me(), createdAt: now, updatedAt: now });
   }
   // 오프라인이면 서버 응답을 기다리지 않음 (로컬 캐시에 먼저 반영되고 나중에 자동 전송)
   job.catch(onWriteError);
+}
+
+/* ---------- 맛집·할거리 → 📅 일정에 추가 ----------
+ *  1) 카드의 '📅 일정에 추가' → 날짜·시간만 고르는 작은 모달 (#formDialog 재사용)
+ *  2) 확인 → events 컬렉션에 새 일정 1개 생성 (saveEntry 그대로 사용 → 작성자·시각 자동 기록)
+ *  3) 토스트의 '일정 보기'로 해당 날짜 탭으로 바로 이동 */
+function scheduleFields() {
+  const days = tripDays();
+  return [
+    { k: "date", label: "날짜", type: "select", required: true,
+      options: days.map((d, i) => [d, `Day ${i + 1} · ${fmtMD(d)}`]) },
+    { k: "time", label: "시간 (몰라도 비워 둬도 돼요)", type: "time" },
+  ];
+}
+
+function openScheduleForm(placeId) {
+  const p = state.places.find((x) => x.id === placeId);
+  if (!p) return toast("항목을 찾을 수 없어요 (다른 가족이 삭제했을 수 있어요)");
+  const days = tripDays();
+  // 기본 날짜 = 일정 탭에서 보고 있던 Day (여행 기간 밖이면 첫날)
+  const def = days.includes(state.day) ? state.day : days[0];
+  const fields = scheduleFields();
+  const kind = KINDS[p.kind] || KINDS.etc;
+  const rsv = RESERVES[p.reserve] || RESERVES.none;
+  const already = scheduledOf(p);
+
+  $("#formTitle").textContent = "📅 일정에 추가";
+  $("#formFields").innerHTML = `
+    <div class="field sched-target">
+      <b>${kind.icon} ${esc(p.name)}</b>
+      <span class="muted small">${esc(p.nameZh || "")}${p.nameZh ? " · " : ""}${rsv.icon} ${rsv.label}${p.reserveHow ? ` · ${esc(p.reserveHow)}` : ""}</span>
+    </div>
+    ${fieldHTML(fields[0], def)}
+    ${fieldHTML(fields[1], "")}
+    <p id="schedHint" class="field sched-hint" hidden></p>
+    ${already.length ? `<p class="field muted small" style="margin:0">ℹ️ 이미 일정에 있어요: ${already.map((e) => `${fmtMD(e.date)}${e.time ? ` ${esc(e.time)}` : ""}`).join(", ")}</p>` : ""}
+    <p class="field muted small" style="margin:0">일정 탭에 '${esc(CATEGORIES[KIND_TO_CAT[p.kind] || "etc"].label)}' 카테고리로 들어가고, 메모에 예약 방법이 적혀요.</p>`;
+  formCtx = { col: "events", id: null, placeId, fields };
+  $("#entryForm [type=submit]").textContent = "📅 일정에 넣기";
+  updateScheduleHint();
+  $("#formDialog").showModal();
+  $("#formFields").scrollTop = 0;
+}
+
+// 고른 날짜에 맞춘 주의 문구 (주말 혼잡 / 출발·귀국일 / 메모에 적힌 휴무 요일)
+function updateScheduleHint() {
+  const hint = $("#schedHint");
+  const p = state.places.find((x) => x.id === formCtx?.placeId);
+  const date = $("#f_date")?.value;
+  if (!hint || !p || !date) return;
+  const dow = parseYMD(date).getDay();
+  const msgs = [];
+  if (date === C.START_DATE) msgs.push("🛫 출발일이에요. 현지 도착 전이라 실제로 갈 수 있는지 확인해 주세요.");
+  if (date === C.END_DATE) msgs.push("🛬 귀국일이에요. 비행기 시간 전 오전에만 가능해요.");
+  if ((dow === 0 || dow === 6) && (p.reserve === "must" || p.reserve === "recommended")) {
+    msgs.push("⚠️ 주말이라 붐벼요. 일정에 넣은 뒤 예약을 꼭 해 두세요!");
+  } else if (p.reserve === "must") {
+    msgs.push("🔴 예약 필수 장소예요. 일정에 넣은 뒤 예약을 꼭 해 두세요!");
+  }
+  if ((p.memo || "").includes(`${WEEK[dow]}요일 휴무`)) msgs.push(`🚫 메모에 '${WEEK[dow]}요일 휴무'라고 적혀 있어요. 다른 날을 골라 주세요.`);
+  hint.innerHTML = msgs.map(esc).join("<br>");
+  hint.hidden = !msgs.length;
+}
+
+function addPlaceToSchedule(placeId, { date, time }) {
+  const p = state.places.find((x) => x.id === placeId);
+  if (!p) return toast("항목을 찾을 수 없어요 (다른 가족이 삭제했을 수 있어요)");
+  // events 규칙(validEvent) 필드만 사용: date, time, title, place, category, reserved, memo
+  const data = {
+    date,
+    time: time || "",
+    title: String(p.name).slice(0, 100),
+    place: String(p.nameZh || p.name).slice(0, 100),
+    category: KIND_TO_CAT[p.kind] || "etc",
+    reserved: false,
+    memo: p.reserveHow ? `예약: ${p.reserveHow}`.slice(0, 500) : "",
+  };
+  saveEntry("events", null, data);
+  state.day = date;
+  ls.set(LS_KEY.day, date);
+  toast(`📅 ${fmtMD(date)} 일정에 넣었어요`, {
+    action: "일정 보기",
+    duration: 5000,
+    onAction: () => {
+      setTab("plan");
+      renderSchedule(true);
+      $("#sec-schedule").scrollIntoView({ block: "start" });
+    },
+  });
 }
 
 function onWriteError(err) {
@@ -851,6 +1113,7 @@ const DEFAULT_CHECKLIST = [
   "상비약 (소화제·해열제·밴드)",
   "여행자 보험",
   "디디(DiDi)·고덕지도 앱 설치",
+  "따종디엔핑 앱 설치·가입(식당 예약)",
   "상하이 디즈니 공식 앱 · 티켓",
 ];
 
@@ -868,6 +1131,8 @@ const DEFAULT_TIPS = [
     "지하철 2·10호선이 공항과 바로 연결돼요. 인민광장·난징동루까지 30~40분.\n택시도 푸동공항보다 훨씬 가깝고 저렴해요."],
   ["🚕 교통 앱 · 지도",
     "• 디디(DiDi): 한국어/영어 지원, 해외 카드·알리페이 결제 가능\n• 지도: 고덕지도(Amap)가 가장 정확. 구글맵은 VPN이 필요하고 위치가 어긋날 수 있어요\n• 장소는 중국어 지명(예: 外滩, 豫园)으로 검색하면 정확해요"],
+  ["🍽️ 식당 예약·웨이팅 요령",
+    "• 따종디엔핑(大众点评) 앱에서 식당 페이지에 '订座(예약)' 버튼이 있는 곳만 예약할 수 있어요\n• 예약(订座)과 웨이팅(排队·원격 줄서기)은 달라요. 예약이 안 되는 곳은 현장 번호표나 앱 원격 대기를 써야 해요\n• 관광객이 많은 와이탄·난징동루·신천지 지점이 특히 붐벼요 (토·일 점심·저녁 피크)\n• 같은 체인이라도 교외·2선 상권 지점은 비교적 한산해요\n• 식사 시간을 30분~1시간 앞당기거나 늦추면 대기가 확 줄어요"],
   ["🆘 긴급 연락처",
     "• 중국 경찰 110 / 구급 120 / 화재 119\n• 외교부 영사콜센터(24시간): +82-2-3210-0404\n• 주상하이 대한민국 총영사관 연락처는 영사콜센터나 외교부 홈페이지에서 확인"],
 ];
@@ -895,12 +1160,64 @@ async function clearSample() {
   toast("샘플을 지웠어요");
 }
 
-// 빈 섹션에서 "기본 준비물/팁 넣기"
+/*
+ * 기본 맛집·할거리 (빈 '맛집·할거리' 탭의 시드 버튼용)
+ *  - 2026-11 웹 검색으로 재확인했지만, 영업시간·가격·예약 방식은 자주 바뀌니 출발 전 재확인 필요
+ *  - 확실하지 않은 정보는 비워 두거나 "확인 필요"로 표시 (지어내지 않음)
+ *  - 여행 일정: 11/20(금) 오후 ~ 11/23(월) 오전이 현지 일정. 토·일(11/21~22)이 가장 붐빔
+ *  형식: [district, kind, reserve, name, nameZh, reserveHow, priceNote, memo]
+ */
+const PLACE_SEED = [
+  // 와이탄·난징동루
+  ["wai", "sight", "none", "와이탄 야경", "外滩", "", "무료",
+    "해 진 뒤 푸동 스카이라인 야경이 하이라이트. 토·일 저녁엔 인파가 많아 소지품·아이 손 주의."],
+  ["wai", "shop", "none", "난징동루 보행가", "南京东路步行街", "", "구경 무료",
+    "와이탄과 걸어서 이어져요. 주말 저녁엔 매우 붐비니 와이탄 야경과 한 동선으로 묶기."],
+  ["wai", "food", "queue", "라오라오 가정식 (동파육·홍사오로우)", "上海姥姥家常饭馆", "현장 대기", "확인 필요",
+    "상하이 가정식. 지점 위치·영업시간은 따종디엔핑에서 확인 필요. 토·일 식사 피크엔 대기가 길 수 있어요."],
+  ["wai", "food", "recommended", "하이디라오 와이탄점", "海底捞火锅(外滩店)", "따종디엔핑 예약·원격 대기", "확인 필요",
+    "관광객 많은 지점이라 토·일 저녁 대기가 길어요. 미리 예약하거나 앱으로 원격 번호표 받기."],
+  ["wai", "food", "queue", "대호춘 생지엔 (군만두)", "大壶春", "현장 대기 (좌석 적음)", "확인 필요",
+    "바닥이 바삭한 생지엔(生煎). 미쉐린 가이드 기준 四川中路136号·08:00~21:00 (재확인 필요). 아침·간식으로 좋아요."],
+
+  // 예원·청황묘
+  ["yuyuan", "sight", "recommended", "예원", "豫园", "예약 필요 여부는 공식 안내 확인 필요", "9~11월 성인 40위안 (확인 필요)",
+    "09:00~16:30 (마지막 입장 16:00), 월요일 휴무(공휴일 제외). ⚠️ 11/23(월) 귀국일은 휴무라 못 가요 → 토·일 오전 일찍 추천."],
+  ["yuyuan", "food", "queue", "남상만두점 (탕바오)", "南翔馒头店", "현장 대기", "확인 필요",
+    "샤오롱바오·탕바오 원조로 유명. 예원 안이라 토·일은 줄이 길어요. 예원 관람 전 이른 시간 추천."],
+  ["yuyuan", "shop", "none", "예원 상가", "豫园商城", "", "",
+    "기념품·간식 거리. 토·일엔 매우 붐벼요. 예원 정원 월요일 휴무와 별개로 상가 영업 여부는 확인 필요."],
+
+  // 신천지·우캉루·푸시
+  ["xintiandi", "food", "must", "예상하이 (북경오리)", "夜上海", "따종디엔핑 订座 (당일 예약 가능 사례 있음)", "확인 필요",
+    "주말 저녁엔 예약 없이 가면 대기가 길어요. 매장 이전 정보가 있어(湖滨路 쪽) 주소를 따종디엔핑에서 꼭 확인."],
+  ["xintiandi", "sight", "none", "우캉맨션·우캉루·안푸루 산책", "武康大楼", "", "무료",
+    "토·일 오후엔 사진 찍는 인파로 혼잡 → 오전 추천. 우캉루~안푸루(安福路) 따라 카페 구경."],
+  ["xintiandi", "cafe", "none", "신천지 카페 거리", "新天地", "", "",
+    "카페·레스토랑 밀집 지역. 주말 저녁엔 붐벼요. 예상하이와 묶어서 동선 짜기 좋아요."],
+
+  // 루자쭈이·푸동
+  ["lujiazui", "sight", "recommended", "상하이타워 전망대", "上海中心大厦", "공식 채널·Trip.com 사전 예매", "성인 약 180위안 (확인 필요)",
+    "118층 전망대. 해 질 무렵이 인기라 토·일엔 사전 예매 권장. 운영 시간은 출처마다 달라 공식 안내 확인 필요."],
+  ["lujiazui", "sight", "recommended", "황푸강 유람선", "黄浦江游船", "Trip.com 등 사전 예약 (취소 가능 상품 확인)", "상품·시간대별로 다름 (확인 필요)",
+    "야간 운항이 인기. 상품마다 탑승 부두(十六铺 등)가 다르고 여권이 필요한 경우가 많아요. 토·일 저녁 표가 먼저 매진돼요."],
+
+  // 디즈니
+  ["disney", "sight", "must", "상하이 디즈니랜드", "上海迪士尼乐园", "공식 앱·공식 웹사이트에서 티켓 사전 구매", "날짜별 변동가 (확인 필요)",
+    "하루 통째로 필요해요. 토·일은 가격·인파 모두 높아요. 날짜 지정 티켓이라 일정 확정 후 구매, 공식 앱으로 대기시간 확인."],
+];
+
+// 빈 섹션에서 "기본 준비물/팁/맛집 넣기"
 function seedSection(col) {
+  if (state[col].length) return toast("이미 항목이 있어서 넣지 않았어요"); // 두 번 눌러 중복되는 것 방지
   const now = backend.now();
+  const today = todayYMD(); // 맛집 정보 확인일 = 넣은 날
   const src = col === "checklist"
     ? DEFAULT_CHECKLIST.map((text, i) => ({ text, done: false, order: i + 1 }))
-    : DEFAULT_TIPS.map(([title, body], i) => ({ title, body, order: i + 1 }));
+    : col === "places"
+      ? PLACE_SEED.map(([district, kind, reserve, name, nameZh, reserveHow, priceNote, memoText]) =>
+        ({ name, nameZh, district, kind, reserve, reserveHow, priceNote, memo: memoText, votes: [], checkedAt: today }))
+      : DEFAULT_TIPS.map(([title, body], i) => ({ title, body, order: i + 1 }));
   backend.addMany(src.map((d) => [col, { ...d, author: me(), updatedBy: me(), createdAt: now, updatedAt: now }])).catch(onWriteError);
   toast("기본 항목을 넣었어요");
 }
@@ -914,7 +1231,7 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const { action, col, id } = btn.dataset;
-  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed"];
+  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed", "vote", "to-schedule"];
   if (needsBackend.includes(action) && !backend) return toast("연결 중이에요. 잠시만요…");
 
   switch (action) {
@@ -936,6 +1253,69 @@ document.addEventListener("click", (e) => {
     case "rename": askName(true); break;
     case "theme": cycleTheme(); break;
     case "close-form": $("#formDialog").close(); break;
+    case "tab": setTab(btn.dataset.tab); break;
+    case "vote": toggleVote(id); break;
+    case "to-schedule": openScheduleForm(id); break;
+    case "place-filter": {
+      const { f, v } = btn.dataset;
+      if (f === "reset") state.placeFilter = { district: "all", kind: "all", reserveOnly: false };
+      else if (f === "reserveOnly") state.placeFilter.reserveOnly = v === "1";
+      else state.placeFilter[f] = v;
+      renderPlaces();
+      break;
+    }
+  }
+});
+
+// ♥ 투표: 내 이름을 votes 배열에 넣었다 뺐다
+function toggleVote(id) {
+  const p = state.places.find((x) => x.id === id);
+  if (!p) return;
+  const on = !votesOf(p).includes(me());
+  if (on && votesOf(p).length >= MAX_VOTES) return toast(`투표는 ${MAX_VOTES}명까지만 돼요`);
+  backend.listToggle("places", id, "votes", me(), on).catch(onWriteError);
+  if (on) toast("♥ 가고 싶어요!");
+}
+
+// 일정에 추가 모달: 날짜 바꾸면 주의 문구 갱신
+document.addEventListener("change", (e) => {
+  if (e.target.id === "f_date" && formCtx?.placeId) updateScheduleHint();
+});
+
+/* ---------- 화면 탭 (일정 / 맛집·할거리) ----------
+ *  - 같은 페이지에서 보이기/숨기기만 바꿈 (헤더·모달·토스트는 공유)
+ *  - 고른 탭은 localStorage에 기억, 주소 끝 #places 로도 바로 열 수 있음 */
+const TABS = ["plan", "places"];
+function setTab(tab, { keepHash = false } = {}) {
+  if (!TABS.includes(tab)) tab = "plan";
+  const changed = state.tab !== tab;
+  state.tab = tab;
+  ls.set(LS_KEY.tab, tab);
+  $("#tab-plan").hidden = tab !== "plan";
+  $("#tab-places").hidden = tab !== "places";
+  $(".quicknav").hidden = tab !== "plan"; // 섹션 바로가기는 일정 탭에서만
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on);
+  });
+  // 주소창 해시: 맛집 탭이면 #places, 일정 탭이면 지움 (기록은 쌓지 않음)
+  if (!keepHash) {
+    const url = location.pathname + location.search + (tab === "places" ? "#places" : "");
+    if (location.href.replace(location.origin, "") !== url) history.replaceState(null, "", url);
+  }
+  // 아래로 내려가 있었다면 탭 막대 바로 아래(새 탭의 맨 위)로 올려 줌
+  if (changed) {
+    const top = $(".hero").offsetHeight;
+    if (window.scrollY > top) window.scrollTo({ top, behavior: "auto" });
+  }
+}
+const initialTab = () => (location.hash === "#places" ? "places" : location.hash.startsWith("#sec-") ? "plan" : ls.get(LS_KEY.tab) || "plan");
+window.addEventListener("hashchange", () => {
+  if (location.hash === "#places") setTab("places");
+  else if (location.hash.startsWith("#sec-") && state.tab !== "plan") {
+    setTab("plan", { keepHash: true });
+    $(location.hash)?.scrollIntoView();
   }
 });
 
@@ -957,6 +1337,15 @@ document.addEventListener("toggle", (e) => {
 $("#entryForm").addEventListener("submit", (e) => {
   e.preventDefault();
   if (!formCtx) return;
+  // 맛집 → 일정에 추가 모달
+  if (formCtx.placeId) {
+    const picked = collectForm(formCtx.col, formCtx.fields);
+    if (!picked) return;
+    $("#formDialog").close();
+    addPlaceToSchedule(formCtx.placeId, picked);
+    formCtx = null;
+    return;
+  }
   const data = collectForm(formCtx.col);
   if (!data) return;
   saveEntry(formCtx.col, formCtx.id, data);
@@ -1042,6 +1431,15 @@ function onListenError(err) {
   }
 }
 
+// 맛집 탭만 권한 오류 = 새 규칙(places)을 아직 게시 안 한 경우 → 나머지 화면은 그대로 두고 맛집 탭에만 안내
+function onPlacesError(err) {
+  if (err?.code !== "permission-denied") return onListenError(err);
+  console.error(err);
+  state.loaded.places = true;
+  state.placesDenied = true;
+  renderPlaces();
+}
+
 /* ---------- 화면 테마: 자동(폰 설정 따라감) → 라이트 → 다크 순서로 바뀜 ---------- */
 const THEME_KEY = "trip.theme"; // index.html 머리의 작은 스크립트와 같은 키
 const THEMES = { auto: "🌓 자동", light: "☀️ 라이트", dark: "🌙 다크" };
@@ -1071,6 +1469,7 @@ applyTheme(ls.get(THEME_KEY));
 
 async function boot() {
   showScreen("app");
+  setTab(initialTab());
   renderAll();
   if (booted) return;
   booted = true;
@@ -1102,7 +1501,7 @@ async function boot() {
       if (col === "events" && backend.mode === "firebase") {
         setSync(meta.fromCache ? "🟡 오프라인 · 저장된 내용 표시 중" : "🟢 실시간 동기화");
       }
-    }, onListenError);
+    }, col === "places" ? onPlacesError : onListenError);
   }
   backend.subscribeSettings((s) => {
     state.settings = s || {};

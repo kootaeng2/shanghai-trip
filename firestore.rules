@@ -105,6 +105,35 @@ service cloud.firestore {
         && metaOk(d);
     }
 
+    // ---- 맛집·할거리 (places) ----
+    // votes: ♥ 누른 사람 이름 목록. 규칙에는 반복문이 없어서 20칸을 하나씩 검사
+    //        (i번째 칸이 없거나, 있으면 1~30자 문자열)
+    function voteAt(v, i) {
+      return v.size() <= i || (v[i] is string && v[i].size() >= 1 && v[i].size() <= 30);
+    }
+    function votesOk(d) {
+      return !('votes' in d) || (
+        d.votes is list && d.votes.size() <= 20
+        && voteAt(d.votes, 0)  && voteAt(d.votes, 1)  && voteAt(d.votes, 2)  && voteAt(d.votes, 3)
+        && voteAt(d.votes, 4)  && voteAt(d.votes, 5)  && voteAt(d.votes, 6)  && voteAt(d.votes, 7)
+        && voteAt(d.votes, 8)  && voteAt(d.votes, 9)  && voteAt(d.votes, 10) && voteAt(d.votes, 11)
+        && voteAt(d.votes, 12) && voteAt(d.votes, 13) && voteAt(d.votes, 14) && voteAt(d.votes, 15)
+        && voteAt(d.votes, 16) && voteAt(d.votes, 17) && voteAt(d.votes, 18) && voteAt(d.votes, 19));
+    }
+    // ⚠️ hasOnly 목록 = app.js 의 SCHEMAS.places 필드 + votes + 공통 메타. 하나라도 다르면 저장 거부됨
+    function validPlace(d) {
+      return d.keys().hasOnly(['name', 'nameZh', 'district', 'kind', 'reserve', 'reserveHow', 'priceNote',
+                               'memo', 'votes', 'checkedAt',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqStr(d, 'name', 100) && optStr(d, 'nameZh', 50)
+        && ('district' in d) && d.district in ['wai', 'yuyuan', 'people', 'xintiandi', 'lujiazui', 'disney', 'etc']
+        && ('kind' in d) && d.kind in ['food', 'cafe', 'sight', 'shop', 'etc']
+        && ('reserve' in d) && d.reserve in ['must', 'recommended', 'none', 'queue']
+        && optStr(d, 'reserveHow', 100) && optStr(d, 'priceNote', 60) && optStr(d, 'memo', 500)
+        && votesOk(d) && optDate(d, 'checkedAt')
+        && metaOk(d);
+    }
+
     // settings/main 문서 하나만: 환율
     function validSettings(d) {
       return d.keys().hasOnly(['exchangeRate', 'updatedBy', 'updatedAt'])
@@ -119,18 +148,19 @@ service cloud.firestore {
           || (col == 'events'    && validEvent(d))
           || (col == 'checklist' && validChecklist(d))
           || (col == 'tips'      && validTip(d))
+          || (col == 'places'    && validPlace(d))
           || (col == 'settings'  && docId == 'main' && validSettings(d));
     }
 
     // ---------------- 접근 규칙 ----------------
     match /trips/{trip}/{col}/{docId} {
       allow read:   if trip == tripId()
-                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'settings'];
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places', 'settings'];
       // request.resource.data = 쓰기 후의 문서 전체 (update 시 기존 값과 합쳐진 결과)
       allow create, update: if trip == tripId() && validDoc(col, docId, request.resource.data);
       // settings 문서는 삭제 불가
       allow delete: if trip == tripId()
-                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips'];
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places'];
     }
 
     // 위에 해당하지 않는 모든 경로는 자동으로 거부됩니다 (trips/{trip} 문서 자체 포함)
