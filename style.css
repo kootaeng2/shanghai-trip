@@ -61,7 +61,11 @@ body {
   -webkit-tap-highlight-color: transparent;
   word-break: keep-all;
   overflow-wrap: anywhere;
+  /* 혹시 뭔가 화면보다 넓어져도 페이지 전체가 옆으로 밀리지 않게 (clip은 sticky 메뉴를 깨지 않음) */
+  overflow-x: clip;
 }
+/* 입장·이름 화면일 때는 바닥 여백도 같은 붉은색으로 (주소창이 접힐 때 베이지색 띠 방지) */
+body:has(> .gate:not([hidden])) { background: var(--hero-2); }
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3 { margin: 0; line-height: 1.3; }
@@ -144,7 +148,9 @@ button.chip { cursor: pointer; }
   background: rgba(255, 224, 138, .14); border: 1px solid rgba(255, 224, 138, .4);
 }
 .gate-sheet {
-  display: grid; gap: 12px;
+  /* minmax(0,1fr): 입력칸의 '기본 글자수 너비'가 화면보다 커도 칸이 화면 밖으로 늘어나지 않게
+     (삼성 폰처럼 기본 글자 크기가 큰 기기에서 오른쪽으로 삐져나오던 문제) */
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
   background: var(--surface); color: var(--text);
   border-radius: 28px 28px 0 0;
   padding: 26px 20px calc(22px + env(safe-area-inset-bottom));
@@ -152,6 +158,7 @@ button.chip { cursor: pointer; }
 }
 .gate-label { font-size: 15px; font-weight: 700; color: var(--muted); }
 .gate-input {
+  width: 100%; min-width: 0;
   min-height: 58px; border-radius: 16px; border: 1.5px solid var(--line);
   background: var(--surface-2); padding: 0 16px; font-size: 20px; text-align: center; letter-spacing: .08em;
 }

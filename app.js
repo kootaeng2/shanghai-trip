@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=6";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=7";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
