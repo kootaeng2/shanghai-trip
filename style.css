@@ -70,6 +70,11 @@ h1, h2, h3 { margin: 0; line-height: 1.3; }
 
 .container { max-width: 720px; margin: 0 auto; padding: 0 16px calc(32px + env(safe-area-inset-bottom)); }
 
+/* 출발 전(D-1 이전)에는 준비물 섹션을 맨 위로 올림. 여행이 시작되면 원래 순서(항공→숙소→일정…) */
+main.container { display: flex; flex-direction: column; }
+.pre-trip #sec-checklist,
+.pre-trip .quicknav a[href="#sec-checklist"] { order: -1; }
+
 /* ---------- 버튼 ---------- */
 .btn {
   min-height: var(--tap);

@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=3";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=4";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -310,6 +310,8 @@ function renderHeader() {
   else if (toEnd >= 0) html = `<strong>Day ${-toStart + 1}</strong><span>여행 ${-toStart + 1}일차 즐기는 중 🎉</span>`;
   else html = `<strong>완료</strong><span>즐거운 추억 가득했길 바라요 📸</span>`;
   $("#dday").innerHTML = html;
+  // 출발 전에는 '준비물 체크리스트'를 맨 위로 (style.css의 .pre-trip 참고)
+  document.body.classList.toggle("pre-trip", toStart > 0);
   $("#whoami").textContent = `👤 ${me()}`;
 }
 
