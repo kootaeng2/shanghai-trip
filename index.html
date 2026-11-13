@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#c8102e" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1a1214" media="(prefers-color-scheme: dark)" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>상하이 가족여행</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏮</text></svg>" />
+
+  <!-- Pretendard 웹폰트 (CDN) -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+
+  <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
+  <link rel="stylesheet" href="style.css?v=1" />
+  <script type="module" src="app.js?v=1"></script>
+</head>
+<body>
+
+  <!-- ============ 1. 가족 코드 입력 화면 ============ -->
+  <section id="gate" class="gate" hidden>
+    <form id="gateForm" class="gate-card" autocomplete="off">
+      <div class="gate-emoji">🏮</div>
+      <h1 class="gate-title" data-bind="title">상하이 가족여행</h1>
+      <p class="gate-desc">가족 코드를 입력해 주세요</p>
+      <input id="gateInput" class="gate-input" type="password" inputmode="text" required
+             placeholder="가족 코드" aria-label="가족 코드" />
+      <p id="gateError" class="gate-error" hidden>코드가 맞지 않아요. 다시 확인해 주세요.</p>
+      <button class="btn btn-primary btn-block" type="submit">입장하기</button>
+    </form>
+  </section>
+
+  <!-- ============ 2. 이름 입력 화면 ============ -->
+  <section id="nameGate" class="gate" hidden>
+    <form id="nameForm" class="gate-card" autocomplete="off">
+      <div class="gate-emoji">👋</div>
+      <h1 class="gate-title">누구세요?</h1>
+      <p class="gate-desc">일정을 추가하면 작성자로 이 이름이 기록돼요.</p>
+      <input id="nameInput" class="gate-input" type="text" maxlength="20" required
+             placeholder="예: 아빠, 엄마, 지민" aria-label="이름" />
+      <button class="btn btn-primary btn-block" type="submit">시작하기</button>
+      <button id="nameCancel" class="btn btn-ghost btn-block" type="button" hidden>취소</button>
+    </form>
+  </section>
+
+  <!-- ============ 3. 메인 앱 ============ -->
+  <div id="app" hidden>
+    <header class="hero">
+      <div class="hero-top">
+        <span id="syncChip" class="chip chip-glass">⏳ 연결 중…</span>
+        <button class="chip chip-glass" type="button" data-action="rename" id="whoami">👤 이름</button>
+      </div>
+      <h1 class="hero-title" data-bind="title">🇨🇳 상하이 가족여행</h1>
+      <p id="tripDates" class="hero-dates"></p>
+      <div id="dday" class="dday"></div>
+    </header>
+
+    <nav class="quicknav" aria-label="섹션 바로가기">
+      <a href="#sec-flights">✈️ 항공</a>
+      <a href="#sec-hotels">🏨 숙소</a>
+      <a href="#sec-schedule">🗓️ 일정</a>
+      <a href="#sec-checklist">✅ 준비물</a>
+      <a href="#sec-budget">💰 예산</a>
+      <a href="#sec-tips">💡 정보</a>
+    </nav>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <main class="container">
+
+      <!-- 항공편 -->
+      <section id="sec-flights" class="section">
+        <div class="section-head">
+          <h2>✈️ 항공편</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="flights">＋ 추가</button>
+        </div>
+        <div id="list-flights" class="stack"></div>
+      </section>
+
+      <!-- 숙소 -->
+      <section id="sec-hotels" class="section">
+        <div class="section-head">
+          <h2>🏨 숙소</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="hotels">＋ 추가</button>
+        </div>
+        <div id="list-hotels" class="stack"></div>
+      </section>
+
+      <!-- 일자별 일정 -->
+      <section id="sec-schedule" class="section">
+        <div class="section-head">
+          <h2>🗓️ 일자별 일정</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="events">＋ 추가</button>
+        </div>
+        <div id="dayTabs" class="day-tabs" role="tablist"></div>
+        <div id="daySummary" class="day-summary"></div>
+        <div id="list-events"></div>
+      </section>
+
+      <!-- 준비물 -->
+      <section id="sec-checklist" class="section">
+        <div class="section-head">
+          <h2>✅ 준비물 체크리스트</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="checklist">＋ 추가</button>
+        </div>
+        <div id="list-checklist"></div>
+      </section>
+
+      <!-- 예산 -->
+      <section id="sec-budget" class="section">
+        <div class="section-head"><h2>💰 예산 요약</h2></div>
+        <div class="card budget">
+          <div id="budgetTotal" class="budget-total"></div>
+          <label class="rate-row">
+            <span>환율 1 CNY =</span>
+            <input id="rateInput" type="number" inputmode="decimal" min="1" step="0.1" aria-label="환율 (원)" />
+            <span>KRW</span>
+          </label>
+          <div id="budgetBody"></div>
+        </div>
+      </section>
+
+      <!-- 유용한 정보 -->
+      <section id="sec-tips" class="section">
+        <div class="section-head">
+          <h2>💡 유용한 정보</h2>
+          <button class="btn btn-add" type="button" data-action="add" data-col="tips">＋ 추가</button>
+        </div>
+        <div id="list-tips" class="stack"></div>
+      </section>
+
+      <!-- 샘플 데이터 -->
+      <section class="section sample-box">
+        <p>처음이라 비어 보이나요? 3박 4일 예시 일정을 넣어 볼 수 있어요.</p>
+        <div class="sample-actions">
+          <button class="btn btn-gold" type="button" data-action="sample">🧧 샘플 데이터 불러오기</button>
+          <button id="clearSampleBtn" class="btn btn-ghost" type="button" data-action="clear-sample" hidden>샘플만 지우기</button>
+        </div>
+        <p class="muted small">샘플 항목을 수정하면 "진짜 일정"으로 바뀌어 '샘플만 지우기'에서 제외돼요.</p>
+      </section>
+
+      <footer class="foot muted small">즐거운 여행 되세요 🐼 · 수정 내용은 가족 모두에게 실시간으로 보여요</footer>
+    </main>
+  </div>
+
+  <!-- ============ 추가/수정 모달 ============ -->
+  <dialog id="formDialog" class="sheet" aria-labelledby="formTitle">
+    <form id="entryForm" class="sheet-inner" novalidate>
+      <div class="sheet-head">
+        <h3 id="formTitle">추가</h3>
+        <button class="icon-btn" type="button" data-action="close-form" aria-label="닫기">✕</button>
+      </div>
+      <div id="formFields" class="sheet-body"></div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" type="button" data-action="close-form">취소</button>
+        <button class="btn btn-primary" type="submit">저장</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ 삭제 확인창 ============ -->
+  <dialog id="confirmDialog" class="confirm">
+    <form method="dialog">
+      <p id="confirmMsg">삭제할까요?</p>
+      <div class="confirm-actions">
+        <button class="btn btn-ghost" value="cancel">취소</button>
+        <button id="confirmOk" class="btn btn-danger" value="ok">삭제</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ============ 토스트(되돌리기) ============ -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript><p style="padding:24px">이 페이지는 자바스크립트가 필요해요.</p></noscript>
+</body>
+</html>

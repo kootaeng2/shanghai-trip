@@ -1,0 +1,138 @@
+rules_version = '2';
+
+// =====================================================================
+// 상하이 가족여행 — Firestore 보안 규칙
+//
+//  ✔ trips/{tripId}/ 아래의 정해진 컬렉션만 읽기·쓰기 허용
+//  ✔ 컬렉션마다 허용 필드 목록(hasOnly) + 타입 + 길이를 검사
+//    → 필드 수와 문자열 길이가 묶여 있어 문서 하나의 크기가 수 KB 이하로 제한됨
+//  ✘ 그 외 모든 경로는 기본 거부
+//
+//  적용 방법: Firebase 콘솔 → Firestore Database → 규칙 탭 → 전체 붙여넣기 → 게시
+//  ⚠️ 이 규칙은 로그인 없이 동작하므로, TRIP_ID를 아는 사람은 누구나 읽고 쓸 수 있어요.
+//     (README의 "보안에 대해 솔직하게" 참고)
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ★ firebase-config.js 의 TRIP_ID 와 반드시 같은 값으로 바꾸세요
+    function tripId() { return 'shanghai-2026-family'; }
+
+    // ---------------- 공통 검사 함수 ----------------
+    // k 필드가 없거나, 문자열이면서 max 글자 이하
+    function optStr(d, k, max) {
+      return !(k in d) || (d[k] is string && d[k].size() <= max);
+    }
+    // k 필드가 반드시 있고, 1~max 글자 문자열
+    function reqStr(d, k, max) {
+      return (k in d) && d[k] is string && d[k].size() >= 1 && d[k].size() <= max;
+    }
+    // 0 이상 max 이하 숫자 (없어도 됨)
+    function optNum(d, k, max) {
+      return !(k in d) || ((d[k] is int || d[k] is float) && d[k] >= 0 && d[k] <= max);
+    }
+    function optBool(d, k) {
+      return !(k in d) || d[k] is bool;
+    }
+    function optTs(d, k) {
+      return !(k in d) || d[k] is timestamp || d[k] is int; // int = 체험 모드 데이터 이전 대비
+    }
+    // 'YYYY-MM-DD' 또는 빈 문자열
+    function optDate(d, k) {
+      return !(k in d) || (d[k] is string && (d[k] == '' || d[k].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')));
+    }
+    function reqDate(d, k) {
+      return (k in d) && d[k] is string && d[k].matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+    // 'HH:MM' 또는 빈 문자열
+    function optTime(d, k) {
+      return !(k in d) || (d[k] is string && (d[k] == '' || d[k].matches('^[0-9]{2}:[0-9]{2}$')));
+    }
+    // 모든 항목 공통: 작성자/수정자/생성·수정 시각/샘플 표시
+    function metaOk(d) {
+      return reqStr(d, 'author', 30)
+        && optStr(d, 'updatedBy', 30)
+        && optTs(d, 'createdAt')
+        && optTs(d, 'updatedAt')
+        && optBool(d, 'sample');
+    }
+
+    // ---------------- 컬렉션별 검사 ----------------
+    function validFlight(d) {
+      return d.keys().hasOnly(['direction', 'airline', 'flightNo', 'depAirport', 'depDate', 'depTime',
+                               'arrAirport', 'arrDate', 'arrTime', 'bookingRef', 'seat', 'memo',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && ('direction' in d) && d.direction in ['out', 'back']
+        && optStr(d, 'airline', 40) && optStr(d, 'flightNo', 20)
+        && optStr(d, 'depAirport', 40) && optDate(d, 'depDate') && optTime(d, 'depTime')
+        && optStr(d, 'arrAirport', 40) && optDate(d, 'arrDate') && optTime(d, 'arrTime')
+        && optStr(d, 'bookingRef', 40) && optStr(d, 'seat', 40) && optStr(d, 'memo', 500)
+        && metaOk(d);
+    }
+
+    function validHotel(d) {
+      return d.keys().hasOnly(['name', 'address', 'checkInDate', 'checkInTime', 'checkOutDate', 'checkOutTime',
+                               'bookingRef', 'phone', 'memo',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqStr(d, 'name', 100) && optStr(d, 'address', 200)
+        && optDate(d, 'checkInDate') && optTime(d, 'checkInTime')
+        && optDate(d, 'checkOutDate') && optTime(d, 'checkOutTime')
+        && optStr(d, 'bookingRef', 40) && optStr(d, 'phone', 40) && optStr(d, 'memo', 500)
+        && metaOk(d);
+    }
+
+    function validEvent(d) {
+      return d.keys().hasOnly(['date', 'time', 'title', 'place', 'category', 'cost', 'reserved', 'memo',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqDate(d, 'date') && optTime(d, 'time')
+        && reqStr(d, 'title', 100) && optStr(d, 'place', 100)
+        && ('category' in d) && d.category in ['sight', 'food', 'move', 'shop', 'rest', 'etc']
+        && optNum(d, 'cost', 10000000) && optBool(d, 'reserved') && optStr(d, 'memo', 500)
+        && metaOk(d);
+    }
+
+    function validChecklist(d) {
+      return d.keys().hasOnly(['text', 'done', 'order',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqStr(d, 'text', 100) && optBool(d, 'done') && optNum(d, 'order', 100000)
+        && metaOk(d);
+    }
+
+    function validTip(d) {
+      return d.keys().hasOnly(['title', 'body', 'order',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqStr(d, 'title', 60) && optStr(d, 'body', 3000) && optNum(d, 'order', 100000)
+        && metaOk(d);
+    }
+
+    // settings/main 문서 하나만: 환율
+    function validSettings(d) {
+      return d.keys().hasOnly(['exchangeRate', 'updatedBy', 'updatedAt'])
+        && ('exchangeRate' in d) && (d.exchangeRate is int || d.exchangeRate is float)
+        && d.exchangeRate > 0 && d.exchangeRate <= 100000
+        && optStr(d, 'updatedBy', 30) && optTs(d, 'updatedAt');
+    }
+
+    function validDoc(col, docId, d) {
+      return (col == 'flights'   && validFlight(d))
+          || (col == 'hotels'    && validHotel(d))
+          || (col == 'events'    && validEvent(d))
+          || (col == 'checklist' && validChecklist(d))
+          || (col == 'tips'      && validTip(d))
+          || (col == 'settings'  && docId == 'main' && validSettings(d));
+    }
+
+    // ---------------- 접근 규칙 ----------------
+    match /trips/{trip}/{col}/{docId} {
+      allow read:   if trip == tripId()
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'settings'];
+      // request.resource.data = 쓰기 후의 문서 전체 (update 시 기존 값과 합쳐진 결과)
+      allow create, update: if trip == tripId() && validDoc(col, docId, request.resource.data);
+      // settings 문서는 삭제 불가
+      allow delete: if trip == tripId()
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips'];
+    }
+
+    // 위에 해당하지 않는 모든 경로는 자동으로 거부됩니다 (trips/{trip} 문서 자체 포함)
+  }
+}
