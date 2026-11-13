@@ -15,12 +15,12 @@
 //    (데이터 보호는 Firestore 보안 규칙이 담당합니다)
 // ---------------------------------------------------------------------
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyDMk--lIURDEsyzDPbZSHoB2Z5NaDN1Kxc",
+  authDomain: "shanghai-trip-16f7d.firebaseapp.com",
+  projectId: "shanghai-trip-16f7d",
+  storageBucket: "shanghai-trip-16f7d.firebasestorage.app",
+  messagingSenderId: "917430692069",
+  appId: "1:917430692069:web:3c3fb4362e507c2de2cc0c",
 };
 
 // ---------------------------------------------------------------------
