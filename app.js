@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=4";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=5";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -146,6 +146,7 @@ const SCHEMAS = {
 };
 
 const COLS = ["flights", "hotels", "events", "checklist", "tips"];
+const CHECK_PER_PAGE = 6; // 준비물 슬라이드 한 페이지에 보여줄 개수
 
 /* =====================================================================
  * 3. 저장소(백엔드)
@@ -253,6 +254,7 @@ const state = {
   loaded: {},          // 컬렉션별 첫 데이터 도착 여부 (스켈레톤 표시용)
   day: ls.get(LS_KEY.day),
   openTips: new Set(), // 펼쳐 둔 팁 (다시 그려도 유지)
+  checkPage: 0,        // 준비물 슬라이드에서 보고 있는 페이지
 };
 let backend = null;
 let booted = false;
@@ -484,9 +486,13 @@ function renderChecklist() {
   const list = [...state.checklist].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || tsVal(a.createdAt) - tsVal(b.createdAt));
   const done = list.filter((c) => c.done).length;
   const pct = Math.round((done / list.length) * 100);
-  el.innerHTML = `
-    <div class="progress"><span>${done}/${list.length} 완료</span><div class="progress-bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
-    <ul class="card checklist">${list.map((c) => `
+
+  // CHECK_PER_PAGE개씩 잘라 좌우로 넘기는 페이지로 만듦
+  const pages = [];
+  for (let i = 0; i < list.length; i += CHECK_PER_PAGE) pages.push(list.slice(i, i + CHECK_PER_PAGE));
+  state.checkPage = Math.min(state.checkPage, pages.length - 1);
+
+  const itemHTML = (c) => `
       <li class="check-item ${c.done ? "done" : ""}">
         <label>
           <input type="checkbox" data-action="toggle" data-id="${esc(c.id)}" ${c.done ? "checked" : ""} />
@@ -494,8 +500,49 @@ function renderChecklist() {
           <span class="check-by">${c.done && c.updatedBy ? `✔ ${esc(c.updatedBy)}` : `✍️ ${esc(c.author || "익명")}`}</span></span>
         </label>
         ${actions("checklist", c.id)}
-      </li>`).join("")}
-    </ul>`;
+      </li>`;
+
+  el.innerHTML = `
+    <div class="progress"><span>${done}/${list.length} 완료</span><div class="progress-bar"><i style="width:${pct}%"></i></div><span>${pct}%</span></div>
+    <div class="check-track" id="checkTrack">
+      ${pages.map((p, i) => `<ul class="card checklist check-page" aria-label="${i + 1}/${pages.length} 페이지">${p.map(itemHTML).join("")}</ul>`).join("")}
+    </div>
+    ${pages.length > 1 ? `
+    <div class="check-pager">
+      <button class="icon-btn" type="button" data-action="check-page" data-dir="-1" aria-label="이전">‹</button>
+      <div class="check-dots">${pages.map((p, i) => {
+        const left = p.filter((c) => !c.done).length; // 남은 항목이 없으면 금색 점
+        return `<button type="button" class="dot ${left ? "" : "all-done"}" data-action="check-page" data-page="${i}" aria-label="${i + 1}페이지"></button>`;
+      }).join("")}</div>
+      <span class="check-count" id="checkCount"></span>
+      <button class="icon-btn" type="button" data-action="check-page" data-dir="1" aria-label="다음">›</button>
+    </div>` : ""}`;
+
+  // 다시 그려도 보던 페이지 유지 (체크할 때마다 첫 페이지로 튀지 않게)
+  const track = $("#checkTrack");
+  track.scrollLeft = track.children[state.checkPage]?.offsetLeft ?? 0;
+  updateCheckDots();
+  track.addEventListener("scroll", () => {
+    const w = track.clientWidth || 1;
+    const page = Math.round(track.scrollLeft / (w + 12)); // 12 = 페이지 간격(gap)
+    if (page !== state.checkPage) { state.checkPage = page; updateCheckDots(); }
+  }, { passive: true });
+}
+
+function updateCheckDots() {
+  const dots = document.querySelectorAll(".check-dots .dot");
+  dots.forEach((d, i) => d.classList.toggle("active", i === state.checkPage));
+  const count = $("#checkCount");
+  if (count) count.textContent = `${state.checkPage + 1} / ${dots.length}`;
+}
+
+function goCheckPage(page) {
+  const track = $("#checkTrack");
+  if (!track) return;
+  const max = track.children.length - 1;
+  state.checkPage = Math.max(0, Math.min(max, page));
+  track.scrollTo({ left: track.children[state.checkPage].offsetLeft, behavior: "smooth" });
+  updateCheckDots();
 }
 
 // ---------- 예산 ----------
@@ -879,6 +926,9 @@ document.addEventListener("click", (e) => {
     case "clear-sample": clearSample(); break;
     case "seed": seedSection(col); break;
     case "copy": copyText(btn.dataset.text); break;
+    case "check-page":
+      goCheckPage(btn.dataset.page !== undefined ? Number(btn.dataset.page) : state.checkPage + Number(btn.dataset.dir));
+      break;
     case "rename": askName(true); break;
     case "close-form": $("#formDialog").close(); break;
   }
