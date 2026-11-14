@@ -408,26 +408,6 @@ button.chip { cursor: pointer; }
 .check-item.done .check-text { text-decoration: line-through; color: var(--muted); }
 .check-by { font-size: 11px; color: var(--muted); display: block; }
 
-/* ---------- 예산 ---------- */
-.budget-total { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.budget-total small { display: block; color: var(--muted); font-size: 13px; }
-.budget-total strong { font-size: 30px; font-weight: 900; color: var(--red); letter-spacing: -.02em; }
-.budget-total .krw { font-size: 18px; font-weight: 800; }
-.rate-row {
-  display: flex; align-items: center; gap: 8px; margin: 14px 0; padding: 10px 12px;
-  border-radius: 12px; background: var(--gold-soft); font-size: 14px; font-weight: 600;
-}
-.rate-row input {
-  width: 96px; min-height: 40px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--surface); padding: 0 10px; font-size: 16px; font-weight: 700; text-align: right;
-}
-.budget h4 { margin: 16px 0 8px; font-size: 14px; color: var(--muted); }
-.brow { display: grid; grid-template-columns: 88px 1fr auto; align-items: center; gap: 10px; font-size: 14px; padding: 5px 0; }
-.brow .bar { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.brow .bar i { display: block; height: 100%; border-radius: inherit; background: var(--cat, var(--gold)); }
-.brow .amt { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
-.brow .amt small { display: block; color: var(--muted); font-weight: 500; font-size: 11px; }
-
 /* ---------- 유용한 정보 (접이식) ---------- */
 .tip { padding: 0; overflow: hidden; }
 .tip summary {
@@ -577,10 +557,9 @@ html { scroll-padding-top: 116px; } /* 고정 막대(탭+바로가기) 높이만
 .place-alert b { color: var(--red); }
 .place-filters { display: grid; gap: 8px; margin-bottom: 14px; }
 .fchips {
-  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
-  margin: 0 -16px; padding: 2px 16px; /* 화면 끝까지 가로 스크롤 */
+  display: flex; flex-wrap: wrap; gap: 6px; /* 잘리지 않게 여러 줄로 줄바꿈 */
+  padding: 2px 0;
 }
-.fchips::-webkit-scrollbar { display: none; }
 .fchip {
   flex: none; min-height: 38px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
   border: 1.5px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600;

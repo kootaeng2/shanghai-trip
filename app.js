@@ -5,12 +5,12 @@
  *  1. 유틸 (localStorage, 날짜, 문자열 이스케이프)
  *  2. 카테고리·폼 스키마 (어떤 섹션에 어떤 입력칸이 있는지)
  *  3. 저장소(백엔드) — Firebase Firestore / 체험 모드(localStorage)
- *  4. 화면 그리기 (항공·숙소·일정·체크리스트·예산·팁)
+ *  4. 화면 그리기 (항공·숙소·일정·체크리스트·팁)
  *  5. 추가/수정 모달, 삭제 + 되돌리기
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=10";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=12";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -610,44 +610,6 @@ function goCheckPage(page, smooth = true) {
   updateCheckDots();
 }
 
-// ---------- 예산 ----------
-function renderBudget() {
-  const rateInput = $("#rateInput");
-  if (document.activeElement !== rateInput) rateInput.value = currentRate();
-
-  const totalEl = $("#budgetTotal");
-  const body = $("#budgetBody");
-  if (!state.loaded.events) { totalEl.innerHTML = ""; body.innerHTML = skeleton(1, "sm"); return; }
-
-  const costOf = (e) => Number(e.cost) || 0;
-  const total = state.events.reduce((s, e) => s + costOf(e), 0);
-  totalEl.innerHTML = `<div><small>총 예상 경비 (일정 비용 합계)</small><strong>¥${fmtNum(total)}</strong></div><div class="krw">≈ ${krw(total)}</div>`;
-
-  if (!total) {
-    body.innerHTML = `<p class="muted small" style="margin:0">일정에 '예상 비용'을 입력하면 여기에 자동으로 합산돼요.</p>`;
-    return;
-  }
-  const row = (label, amount, color) => `<div class="brow" ${color ? `style="--cat:${color}"` : ""}>
-      <span>${label}</span><div class="bar"><i style="width:${(amount / total) * 100}%"></i></div>
-      <span class="amt">¥${fmtNum(amount)}<small>${krw(amount)}</small></span></div>`;
-
-  const days = tripDays();
-  const dates = [...new Set([...days, ...state.events.map((e) => e.date)])].filter(Boolean).sort();
-  const byDay = dates.map((d) => {
-    const amt = state.events.filter((e) => e.date === d).reduce((s, e) => s + costOf(e), 0);
-    const i = days.indexOf(d);
-    return amt ? row(i >= 0 ? `Day ${i + 1} <small class="muted">${fmtMD(d)}</small>` : fmtMD(d), amt) : "";
-  }).join("");
-  const byCat = Object.entries(CATEGORIES).map(([k, c]) => {
-    const amt = state.events.filter((e) => (e.category || "etc") === k).reduce((s, e) => s + costOf(e), 0);
-    return amt ? row(`${c.icon} ${c.label}`, amt, c.color) : "";
-  }).join("");
-  const missing = state.events.filter((e) => !costOf(e)).length;
-
-  body.innerHTML = `<h4>날짜별</h4>${byDay}<h4>카테고리별</h4>${byCat}
-    ${missing ? `<p class="muted small">비용이 입력되지 않은 일정 ${missing}개는 0원으로 계산했어요.</p>` : ""}`;
-}
-
 // ---------- 유용한 정보 ----------
 function renderTips() {
   const el = $("#list-tips");
@@ -781,7 +743,7 @@ function renderSampleButton() {
 const RENDER = {
   flights: renderFlights,
   hotels: renderHotels,
-  events: () => { renderSchedule(); renderBudget(); renderPlaces(); }, // 맛집 카드의 '📅 일정에 있음' 표시도 갱신
+  events: () => { renderSchedule(); renderPlaces(); }, // 맛집 카드의 '📅 일정에 있음' 표시도 갱신
   checklist: renderChecklist,
   tips: renderTips,
   places: renderPlaces,
@@ -1120,7 +1082,7 @@ const DEFAULT_CHECKLIST = [
 // 고정 팁 (수정 가능). 정책·요금은 바뀔 수 있으니 출발 전 꼭 다시 확인!
 const DEFAULT_TIPS = [
   ["💱 환율 & 환전",
-    "1위안(CNY) ≈ 190~200원 안팎 (수시로 변동).\n예산 섹션의 환율 입력칸을 고치면 가족 모두의 화면에 반영돼요.\n\n현지는 대부분 모바일 결제라 현금은 소액만 준비해도 충분해요. 작은 가게·택시 비상용으로 몇백 위안 정도."],
+    "1위안(CNY) ≈ 190~200원 안팎 (수시로 변동).\n\n현지는 대부분 모바일 결제라 현금은 소액만 준비해도 충분해요. 작은 가게·택시 비상용으로 몇백 위안 정도."],
   ["📱 알리페이 / 위챗페이",
     "• 알리페이 앱 설치 → 해외 발급 비자/마스터 카드 등록 → 여권으로 본인 인증\n• 위챗페이도 해외 카드 연결 가능\n• 일정 금액 이상 결제 시 수수료가 붙을 수 있어요\n• 한국 출발 전에 설치·인증까지 끝내 두기 (현지에서 인증 문자 받기 어려울 수 있음)\n• 지하철은 알리페이 안의 교통 QR코드로 탈 수 있어요"],
   ["🌐 와이파이 / VPN",
@@ -1526,19 +1488,6 @@ for (const d of [$("#formDialog"), $("#confirmDialog"), $("#searchDialog")]) {
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
 }
 
-// 환율 입력: 바로 화면 반영, 0.6초 뒤 저장(가족에게 동기화)
-let rateTimer = null;
-$("#rateInput").addEventListener("input", (e) => {
-  const v = parseFloat(e.target.value);
-  if (!Number.isFinite(v) || v <= 0 || v > 100000) return;
-  state.settings.exchangeRate = v;
-  renderBudget(); renderSchedule();
-  clearTimeout(rateTimer);
-  rateTimer = setTimeout(() => {
-    backend?.saveSettings({ exchangeRate: v, updatedBy: me(), updatedAt: backend.now() }).catch(onWriteError);
-  }, 600);
-});
-
 // 다른 앱 갔다 돌아오면 D-Day 갱신 (자정 넘김 대응)
 document.addEventListener("visibilitychange", () => { if (!document.hidden && booted) renderHeader(); });
 window.addEventListener("online", () => booted && backend?.mode === "firebase" && setSync("🟢 실시간 동기화"));
@@ -1673,7 +1622,6 @@ async function boot() {
   }
   backend.subscribeSettings((s) => {
     state.settings = s || {};
-    renderBudget();
     renderSchedule();
   }, onListenError);
 }
