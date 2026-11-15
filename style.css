@@ -689,3 +689,12 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .memo-more:active { opacity: .6; }
+
+/* 일정 카드 메모는 작고 얇게 (항공·숙소·맛집 카드 메모는 그대로) */
+.tl-card .memo {
+  margin-top: 8px; padding: 6px 10px; border-radius: 10px;
+  font-size: 12.5px; line-height: 1.5; color: var(--muted);
+}
+.tl-card .memo-wrap { padding-bottom: 0; }
+.tl-card .memo-wrap.fits { padding-bottom: 6px; }
+.tl-card .memo-more { min-height: 26px; padding: 2px 6px; font-size: 12px; margin-top: 0; }
