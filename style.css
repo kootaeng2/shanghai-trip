@@ -368,7 +368,7 @@ button.chip { cursor: pointer; }
   font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
   color: var(--cat); background: color-mix(in srgb, var(--cat) 14%, var(--surface));
 }
-.tl-title { font-size: 17px; font-weight: 800; margin: 2px 0 2px; }
+.tl-title { font-size: 20px; font-weight: 800; margin: 2px 0 2px; }
 .cost { font-size: 14px; font-weight: 700; margin-top: 4px; }
 .cost small { color: var(--muted); font-weight: 500; }
 
