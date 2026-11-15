@@ -678,5 +678,5 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .tl-card .memo {
   width: fit-content; max-width: 100%;
   margin-top: 6px; padding: 5px 10px; border-radius: 10px;
-  font-size: 14px; line-height: 1.45;
+  font-size: 18px; line-height: 1.45;
 }
