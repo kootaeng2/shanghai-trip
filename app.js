@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=14";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=15";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -341,15 +341,14 @@ function byline(item) {
 }
 // 메모: 3줄이 넘을 것 같으면 접어 두고 "더보기 ▾"로 펼침 (펼친 상태는 다시 그려도 유지)
 const MEMO_LINES = 3, MEMO_CHARS_PER_LINE = 22; // 폰 화면 기준 대략 한 줄 글자 수
-const memoLines = (text) => text.split("
-").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / MEMO_CHARS_PER_LINE)), 0);
+const memoLines = (text) => text.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / MEMO_CHARS_PER_LINE)), 0);
 const memo = (text) => {
   if (!text) return "";
   if (memoLines(text) <= MEMO_LINES) return `<p class="memo">${esc(text)}</p>`;
   const open = state.openMemos.has(text);
   queueMemoFit();
-  return `<div class="memo-wrap${open ? " open" : ""}" data-memo="${esc(text)}">
-    <p class="memo">${esc(text)}</p>
+  return `<div class="memo memo-wrap${open ? " open" : ""}" data-memo="${esc(text)}">
+    <div class="memo-text">${esc(text)}</div>
     <button class="memo-more" type="button" data-action="memo-toggle" aria-expanded="${open}">${open ? "접기 ▴" : "더보기 ▾"}</button>
   </div>`;
 };

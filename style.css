@@ -674,14 +674,17 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .check-item.flash { animation: flash-bg 1.8s ease-out; border-radius: 10px; }
 @keyframes flash-bg { 0%, 30% { background: var(--gold-soft); } 100% { background: transparent; } }
 
-/* 긴 메모 접기/펼치기 (3줄까지만 보이고 "더보기 ▾") */
-.memo-wrap .memo {
+/* 긴 메모 접기/펼치기 (3줄까지만 보이고 "더보기 ▾")
+   회색 상자(.memo)는 바깥에, 줄 자르기는 여백 없는 안쪽 글(.memo-text)에 걸어서 4번째 줄이 비치지 않게 */
+.memo-wrap { padding-bottom: 4px; }
+.memo-wrap .memo-text {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
 }
-.memo-wrap.open .memo { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+.memo-wrap.open .memo-text { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
 .memo-wrap.fits .memo-more { display: none; }
+.memo-wrap.fits { padding-bottom: 10px; }
 .memo-more {
-  display: block; margin: 4px 0 0 auto; padding: 4px 10px; min-height: 32px;
+  display: block; margin: 2px -4px 0 auto; padding: 4px 8px; min-height: 32px;
   border: 0; border-radius: 8px; background: none; color: var(--red);
   font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
 }
