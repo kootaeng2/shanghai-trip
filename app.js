@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=15";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=17";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -314,7 +314,6 @@ const state = {
   loaded: {},          // 컬렉션별 첫 데이터 도착 여부 (스켈레톤 표시용)
   day: ls.get(LS_KEY.day),
   openTips: new Set(), // 펼쳐 둔 팁 (다시 그려도 유지)
-  openMemos: new Set(), // 펼쳐 둔 긴 메모 (메모 글 기준)
   checkPage: 0,        // 준비물 슬라이드에서 보고 있는 페이지
 };
 let backend = null;
@@ -339,33 +338,7 @@ function byline(item) {
   const edited = item.updatedBy && item.updatedBy !== item.author ? ` · 수정 ${esc(item.updatedBy)}` : "";
   return `<div class="byline">✍️ ${esc(item.author || "익명")}${edited}</div>`;
 }
-// 메모: 3줄이 넘을 것 같으면 접어 두고 "더보기 ▾"로 펼침 (펼친 상태는 다시 그려도 유지)
-const MEMO_LINES = 3, MEMO_CHARS_PER_LINE = 22; // 폰 화면 기준 대략 한 줄 글자 수
-const memoLines = (text) => text.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / MEMO_CHARS_PER_LINE)), 0);
-const memo = (text) => {
-  if (!text) return "";
-  if (memoLines(text) <= MEMO_LINES) return `<p class="memo">${esc(text)}</p>`;
-  const open = state.openMemos.has(text);
-  queueMemoFit();
-  return `<div class="memo memo-wrap${open ? " open" : ""}" data-memo="${esc(text)}">
-    <div class="memo-text">${esc(text)}</div>
-    <button class="memo-more" type="button" data-action="memo-toggle" aria-expanded="${open}">${open ? "접기 ▴" : "더보기 ▾"}</button>
-  </div>`;
-};
-// 넓은 화면에서 실제로 3줄 안에 다 들어가면 "더보기" 버튼을 숨김 (보이는 메모만 측정)
-let memoFitQueued = false;
-function queueMemoFit() {
-  if (memoFitQueued) return;
-  memoFitQueued = true;
-  requestAnimationFrame(() => {
-    memoFitQueued = false;
-    document.querySelectorAll(".memo-wrap:not(.open)").forEach((w) => {
-      const p = w.firstElementChild;
-      if (p.clientHeight) w.classList.toggle("fits", p.scrollHeight <= p.clientHeight + 2);
-    });
-  });
-}
-window.addEventListener("resize", queueMemoFit);
+const memo = (text) => (text ? `<p class="memo">${esc(text)}</p>` : "");
 // 기본 지도(고덕) 링크 + 보조 지도(구글) 작은 링크
 const mapLink = (q) => {
   if (!q) return "";
@@ -1238,14 +1211,6 @@ document.addEventListener("click", (e) => {
     case "theme": cycleTheme(); break;
     case "close-form": $("#formDialog").close(); break;
     case "tab": setTab(btn.dataset.tab); break;
-    case "memo-toggle": {
-      const w = btn.closest(".memo-wrap");
-      const open = w.classList.toggle("open");
-      open ? state.openMemos.add(w.dataset.memo) : state.openMemos.delete(w.dataset.memo);
-      btn.textContent = open ? "접기 ▴" : "더보기 ▾";
-      btn.setAttribute("aria-expanded", open);
-      break;
-    }
     case "vote": toggleVote(id); break;
     case "to-schedule": openScheduleForm(id); break;
     case "search": openSearch(); break;
