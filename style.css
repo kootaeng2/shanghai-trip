@@ -673,3 +673,16 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 }
 .check-item.flash { animation: flash-bg 1.8s ease-out; border-radius: 10px; }
 @keyframes flash-bg { 0%, 30% { background: var(--gold-soft); } 100% { background: transparent; } }
+
+/* 긴 메모 접기/펼치기 (3줄까지만 보이고 "더보기 ▾") */
+.memo-wrap .memo {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.memo-wrap.open .memo { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+.memo-wrap.fits .memo-more { display: none; }
+.memo-more {
+  display: block; margin: 4px 0 0 auto; padding: 4px 10px; min-height: 32px;
+  border: 0; border-radius: 8px; background: none; color: var(--red);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.memo-more:active { opacity: .6; }
