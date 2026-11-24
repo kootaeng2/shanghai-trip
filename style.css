@@ -686,17 +686,38 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 /* 메모 안 "· " 줄 = 세부 내역 (작고 연하게) */
 .memo-sub { font-size: .78em; color: var(--muted); }
 
-/* 📝 사용내역 정리 탭 */
-.notes-count { margin: 0 0 4px; }
-.note { padding: 12px 14px 8px; }
-.note.is-done { opacity: .72; }
-.note-head { display: flex; align-items: flex-start; gap: 8px; }
-.note-title { flex: 1; margin: 0; font-size: 18px; font-weight: 800; }
-.note-status {
-  flex: none; border: 1px solid var(--line); background: var(--surface-2); color: inherit;
-  border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+/* 📝 사용내역 정리 탭: 엑셀처럼 칸을 눌러 바로 고치는 표 */
+.note-days { margin-bottom: 8px; }
+.note-days small { opacity: .7; font-weight: 600; }
+.sheet-wrap {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
 }
-.note-body { margin-top: 8px; white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.55; }
-.note-foot { display: flex; align-items: center; gap: 2px; margin-top: 8px; }
-.note-foot .byline { margin: 0; flex: 1; }
-.note.is-done .note-status { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.sheet { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 15px; }
+.sheet th, .sheet td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; text-align: left; }
+.sheet th:last-child, .sheet td:last-child { border-right: 0; }
+.sheet thead th {
+  background: var(--surface-2); color: var(--muted); font-size: 13px; font-weight: 800;
+  padding: 8px 8px; white-space: nowrap;
+}
+.sheet .cell {
+  width: 100%; min-height: 42px; border: 0; background: transparent; color: var(--text);
+  font: inherit; font-size: 16px; padding: 6px 8px; border-radius: 0;
+}
+.sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
+.sheet input[type="checkbox"].cell { width: 20px; min-height: 20px; margin: 0 auto; display: block; accent-color: var(--ok); }
+.sheet .c-date { width: 86px; }
+.sheet .c-time { width: 96px; }
+.sheet .c-place { width: 130px; }
+.sheet .c-item { width: 150px; }
+.sheet .c-amount { width: 92px; }
+.sheet td.c-amount .cell { text-align: right; }
+.sheet .c-done { width: 48px; text-align: center; }
+.sheet .c-del { width: 44px; text-align: center; }
+.sheet .c-del .icon-btn { width: 40px; height: 40px; }
+.sheet tr.is-done td { background: var(--ok-soft); }
+.sheet tr.is-done .cell { color: var(--muted); }
+.sheet tfoot th { padding: 10px 8px; font-weight: 800; background: var(--surface-2); border-bottom: 0; }
+.sheet tfoot .c-amount { text-align: right; color: var(--red); white-space: nowrap; }
+.sheet-empty { padding: 18px 12px !important; color: var(--muted); text-align: center !important; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }

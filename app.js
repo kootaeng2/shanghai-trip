@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=21";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=22";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -195,17 +195,27 @@ const SCHEMAS = {
   },
 };
 
-// 📝 사용내역 정리: 가족이 쓴 돈·기억을 글로 올려 두는 곳 (일정에는 자동 반영 안 됨)
+// 📝 사용내역 정리: 엑셀처럼 한 줄 = 한 건 (언제·어디서·무엇을·얼마·평가). 일정에는 자동 반영 안 됨
 // ⚠️ 필드 + 공통 메타가 firestore.rules validNote 의 hasOnly 목록과 같아야 함
+const NOTE_COLS = [
+  { k: "date", label: "언제", type: "day" },
+  { k: "time", label: "시간", type: "time" },
+  { k: "place", label: "어디서", max: 100, ph: "예원" },
+  { k: "item", label: "무엇을", max: 100, ph: "토끼사탕" },
+  { k: "amount", label: "얼마(¥)", type: "number" },
+  { k: "rating", label: "평가", max: 300, ph: "맛있음 👍" },
+];
 SCHEMAS.notes = {
-  title: "사용내역·기록",
+  title: "사용내역",
   fields: [
-    { k: "title", label: "제목", max: 60, required: true, placeholder: "엄마 · 3일차 지출" },
-    { k: "body", label: "내용", type: "textarea", max: 5000, rows: 12,
-      placeholder: "아침 지엔빙 40위안\n택시 23위안 (디디)\n점심 ○○ 320위안 — 맛있었음!" },
-    { k: "done", label: "✅ 일정에 정리 완료", type: "checkbox" },
+    { k: "date", label: "언제", type: "date", half: true },
+    { k: "time", label: "시간", type: "time", half: true },
+    { k: "place", label: "어디서", max: 100 },
+    { k: "item", label: "무엇을", max: 100 },
+    { k: "amount", label: "얼마 (CNY)", type: "number", max: 10000000, half: true },
+    { k: "done", label: "✅ 일정에 반영함", type: "checkbox", half: true },
+    { k: "rating", label: "평가", type: "textarea", max: 300 },
   ],
-  hint: "여기 적은 내용은 일정에 자동으로 들어가지 않아요. 정리 담당이 보고 일정에 옮긴 뒤 '정리 완료'를 체크해요.",
 };
 
 const COLS = ["flights", "hotels", "events", "checklist", "tips", "places", "notes"];
@@ -641,7 +651,32 @@ function renderTips() {
     </details>`).join("");
 }
 
-// ---------- 📝 사용내역 정리 (글로만 저장, 일정 미반영) ----------
+// ---------- 📝 사용내역 표 (엑셀처럼 칸을 눌러 바로 고침, 일정 미반영) ----------
+//  - 칸에서 빠져나오면(change) 그 칸만 저장 → 가족이 동시에 다른 줄을 고쳐도 안 덮어씀
+//  - 내가 칸에 입력 중일 때 남의 수정이 오면, 입력이 끝난 뒤에 다시 그림 (커서 안 날아가게)
+state.noteDay = "all";
+let notesPending = false;
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const noteSort = (a, b) => `${a.date || "9"}${a.time || "99"}`.localeCompare(`${b.date || "9"}${b.time || "99"}`)
+  || tsVal(a.createdAt) - tsVal(b.createdAt);
+const fmtCny = (n) => (Math.round(n * 100) / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+
+function noteCell(n, c) {
+  const v = n[c.k];
+  const base = `class="cell" data-note="${esc(n.id)}" data-k="${c.k}" aria-label="${c.label}"`;
+  if (c.type === "day") {
+    const days = tripDays();
+    const opts = [["", "-"], ...days.map((d) => [d, fmtMD(d)])];
+    if (v && !days.includes(v)) opts.push([v, fmtMD(v)]);
+    return `<select ${base}>${opts.map(([val, t]) => `<option value="${val}" ${val === (v || "") ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+  }
+  if (c.type === "time") return `<input type="time" ${base} value="${esc(v || "")}">`;
+  if (c.type === "number") {
+    return `<input type="number" inputmode="decimal" step="0.01" min="0" ${base} value="${v ? esc(v) : ""}" placeholder="0">`;
+  }
+  return `<input type="text" ${base} maxlength="${c.max}" value="${esc(v || "")}" placeholder="${esc(c.ph)}">`;
+}
+
 function renderNotes() {
   const el = $("#list-notes");
   if (!el) return;
@@ -650,37 +685,100 @@ function renderNotes() {
     return (el.innerHTML = emptyBox("🔒", "정리 탭 저장 권한이 아직 없어요",
       "Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules 전체를 붙여넣고 '게시'한 뒤 새로고침해 주세요."));
   }
-  if (!state.notes.length) {
-    return (el.innerHTML = emptyBox("📝", "아직 올라온 기록이 없어요",
-      "쓴 돈, 영수증 내용, 기억나는 일을 편하게 적어 주세요. 정리 담당이 보고 일정에 옮겨요.",
-      `<button class="btn btn-gold" type="button" data-action="add" data-col="notes">＋ 기록 올리기</button>`));
+  // 입력 중이면 나중에 그림
+  if (el.contains(document.activeElement) && document.activeElement.classList.contains("cell")) {
+    notesPending = true;
+    return;
   }
-  // 정리 전 것이 위, 같은 상태끼리는 최근 것이 위
-  const list = [...state.notes].sort((a, b) => Number(!!a.done) - Number(!!b.done) || tsVal(b.createdAt) - tsVal(a.createdAt));
-  const todo = list.filter((n) => !n.done).length;
-  el.innerHTML = `<p class="notes-count muted small">📥 정리 전 <b>${todo}</b>개 · ✅ 정리 완료 ${list.length - todo}개</p>` +
-    list.map((n) => `
-    <article class="card note ${n.done ? "is-done" : ""}">
-      <div class="note-head">
-        <h3 class="note-title">${esc(n.title)}</h3>
-        <button class="note-status" type="button" data-action="note-done" data-id="${esc(n.id)}"
-          aria-pressed="${!!n.done}" title="눌러서 상태 바꾸기">${n.done ? "✅ 정리 완료" : "📥 정리 전"}</button>
-      </div>
-      <div class="note-body">${esc(n.body)}</div>
-      <div class="note-foot">
-        ${byline(n)}
-        <button class="icon-btn" type="button" data-action="copy" data-text="${esc(`${n.title}\n${n.body || ""}`)}" aria-label="내용 복사">📋</button>
-        ${actions("notes", n.id)}
-      </div>
-    </article>`).join("");
+  notesPending = false;
+
+  const all = [...state.notes].sort(noteSort);
+  const days = tripDays();
+  const sumOf = (list) => list.reduce((s, n) => s + (Number(n.amount) || 0), 0);
+  const chip = (v, label, list) => `<button class="fchip ${state.noteDay === v ? "active" : ""}" type="button"
+    data-action="note-day" data-day="${v}" aria-pressed="${state.noteDay === v}">${label}${list.length ? ` <small>${list.length}</small>` : ""}</button>`;
+  const chips = chip("all", "전체", all) +
+    days.map((d, i) => chip(d, `${i + 1}일차`, all.filter((n) => n.date === d))).join("");
+  const rows = state.noteDay === "all" ? all : all.filter((n) => n.date === state.noteDay);
+  const sum = sumOf(rows);
+
+  el.innerHTML = `
+    <div class="place-filters note-days">${chips}</div>
+    <div class="sheet-wrap">
+      <table class="sheet">
+        <thead><tr>${NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("")}<th class="c-done" title="일정에 반영함">반영</th><th class="c-del"></th></tr></thead>
+        <tbody>${rows.length ? rows.map((n) => `
+          <tr class="${n.done ? "is-done" : ""}" data-row="${esc(n.id)}" title="✍️ ${esc(n.author || "")}${n.updatedBy && n.updatedBy !== n.author ? ` · 수정 ${esc(n.updatedBy)}` : ""}">
+            ${NOTE_COLS.map((c) => `<td class="c-${c.k}">${noteCell(n, c)}</td>`).join("")}
+            <td class="c-done"><input type="checkbox" class="cell" data-note="${esc(n.id)}" data-k="done" ${n.done ? "checked" : ""} aria-label="일정에 반영함"></td>
+            <td class="c-del"><button class="icon-btn" type="button" data-action="delete" data-col="notes" data-id="${esc(n.id)}" aria-label="이 줄 삭제">🗑️</button></td>
+          </tr>`).join("") : `<tr><td colspan="${NOTE_COLS.length + 2}" class="sheet-empty">아직 적은 내역이 없어요. 아래 <b>＋ 한 줄 추가</b>를 눌러 주세요.</td></tr>`}
+        </tbody>
+        <tfoot><tr><th colspan="4">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="3" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
+      </table>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-gold" type="button" data-action="note-add">＋ 한 줄 추가</button>
+      <button class="btn" type="button" data-action="note-copy">📋 표 복사 (엑셀 붙여넣기)</button>
+    </div>
+    <p class="muted small">칸을 눌러 바로 고치면 자동 저장돼요. 표가 넓으면 옆으로 밀어 보세요. 줄에 손가락을 올리면(PC는 마우스) 누가 적었는지 보여요.</p>`;
 }
 
-function toggleNoteDone(id) {
+// 칸 하나 저장
+function saveNoteCell(input) {
+  const { note: id, k } = input.dataset;
   const n = state.notes.find((x) => x.id === id);
-  if (!n) return;
-  backend.update("notes", id, { done: !n.done, updatedBy: me(), updatedAt: backend.now() }).catch(onWriteError);
-  toast(n.done ? "📥 정리 전으로 바꿨어요" : "✅ 정리 완료!");
+  if (!n || !backend) return;
+  let v;
+  if (k === "done") v = input.checked;
+  else if (k === "amount") {
+    v = Math.max(0, Math.round((Number(input.value) || 0) * 100) / 100);
+  } else v = input.value.trim().slice(0, Number(input.maxLength) > 0 ? Number(input.maxLength) : 300);
+  if ((n[k] ?? (k === "amount" ? 0 : k === "done" ? false : "")) === v) return;
+  if (k === "done") input.closest("tr")?.classList.toggle("is-done", v);
+  backend.update("notes", id, { [k]: v, updatedBy: me(), updatedAt: backend.now() }).catch(onWriteError);
 }
+
+function addNoteRow() {
+  const days = tripDays();
+  const today = todayYMD();
+  const date = state.noteDay !== "all" ? state.noteDay : days.includes(today) ? today : "";
+  const id = newId();
+  const now = backend.now();
+  backend.set("notes", id, { date, item: "", place: "", rating: "", amount: 0, done: false,
+    author: me(), updatedBy: me(), createdAt: now, updatedAt: now }).catch(onWriteError);
+  // 화면에 새 줄이 생기면 '어디서' 칸에 커서
+  setTimeout(() => {
+    const cell = document.querySelector(`.cell[data-note="${CSS.escape(id)}"][data-k="place"]`);
+    if (cell) { cell.scrollIntoView({ block: "nearest", inline: "start" }); cell.focus(); }
+  }, 150);
+}
+
+// 표 전체를 탭으로 구분한 글로 복사 → 엑셀·구글시트에 그대로 붙여넣기
+function copyNotesTable() {
+  const rows = [...state.notes].sort(noteSort)
+    .filter((n) => state.noteDay === "all" || n.date === state.noteDay);
+  const clean = (s) => String(s ?? "").replace(/[\t\n]+/g, " ");
+  const lines = [["날짜", "시간", "어디서", "무엇을", "금액(위안)", "평가", "반영", "작성"].join("\t"),
+    ...rows.map((n) => [n.date, n.time, n.place, n.item, n.amount || 0, n.rating, n.done ? "O" : "", n.author].map(clean).join("\t"))];
+  copyText(lines.join("\n"));
+}
+
+// 칸 입력 이벤트: 값이 바뀌면 저장, 칸에서 빠져나가면 밀린 화면 갱신
+document.addEventListener("change", (e) => {
+  if (e.target.matches?.(".sheet .cell")) saveNoteCell(e.target);
+});
+document.addEventListener("keydown", (e) => {
+  // 엔터 = 저장하고 칸 빠져나오기 (엑셀 느낌)
+  if (e.key === "Enter" && e.target.matches?.(".sheet input.cell")) e.target.blur();
+});
+document.addEventListener("focusout", (e) => {
+  if (!e.target.matches?.(".sheet .cell")) return;
+  setTimeout(() => {
+    const active = document.activeElement;
+    if (notesPending && !(active?.classList.contains("cell") && $("#list-notes")?.contains(active))) renderNotes();
+  }, 0);
+});
 
 // ---------- 맛집·할거리 ----------
 const votesOf = (p) => (Array.isArray(p.votes) ? p.votes : []);
@@ -1013,7 +1111,7 @@ function onWriteError(err) {
   toast(msg, { duration: 5000 });
 }
 
-const labelOf = (item) => item.title || item.name || item.text || [item.airline, item.flightNo].filter(Boolean).join(" ") || "항목";
+const labelOf = (item) => item.title || item.name || item.text || item.item || [item.airline, item.flightNo].filter(Boolean).join(" ") || "항목";
 
 async function removeEntry(col, id) {
   const item = state[col].find((x) => x.id === id);
@@ -1245,7 +1343,7 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const { action, col, id } = btn.dataset;
-  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed", "vote", "to-schedule", "note-done"];
+  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed", "vote", "to-schedule", "note-add"];
   if (needsBackend.includes(action) && !backend) return toast("연결 중이에요. 잠시만요…");
 
   switch (action) {
@@ -1269,7 +1367,9 @@ document.addEventListener("click", (e) => {
     case "close-form": $("#formDialog").close(); break;
     case "tab": setTab(btn.dataset.tab); break;
     case "vote": toggleVote(id); break;
-    case "note-done": toggleNoteDone(id); break;
+    case "note-add": addNoteRow(); break;
+    case "note-copy": copyNotesTable(); break;
+    case "note-day": state.noteDay = btn.dataset.day; renderNotes(); break;
     case "to-schedule": openScheduleForm(id); break;
     case "search": openSearch(); break;
     case "close-search": $("#searchDialog").close(); break;
@@ -1383,7 +1483,7 @@ function searchDocs() {
     [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
   state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
   state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
-  state.notes.forEach((n) => add("notes", n, n.title, n.done ? "✅ 정리 완료" : "📥 정리 전", [n.body, n.author]));
+  state.notes.forEach((n) => add("notes", n, n.item || n.place || "사용내역", [fmtMD(n.date), n.time, n.place, n.amount ? `¥${n.amount}` : ""].filter(Boolean).join(" · "), [n.rating, n.author]));
   return docs;
 }
 
