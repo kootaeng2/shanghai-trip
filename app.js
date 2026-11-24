@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=20";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=21";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -27,7 +27,7 @@ const LS_KEY = {
   code: `trip:${C.TRIP_ID}:familyCode`, // 맞게 입력한 가족 코드
   name: "trip:userName",                // 내 이름(작성자)
   day: `trip:${C.TRIP_ID}:selectedDay`, // 마지막으로 본 Day 탭
-  tab: `trip:${C.TRIP_ID}:tab`,         // 마지막으로 본 화면 탭 (plan / places)
+  tab: `trip:${C.TRIP_ID}:tab`,         // 마지막으로 본 화면 탭 (plan / places / notes)
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -195,7 +195,20 @@ const SCHEMAS = {
   },
 };
 
-const COLS = ["flights", "hotels", "events", "checklist", "tips", "places"];
+// 📝 사용내역 정리: 가족이 쓴 돈·기억을 글로 올려 두는 곳 (일정에는 자동 반영 안 됨)
+// ⚠️ 필드 + 공통 메타가 firestore.rules validNote 의 hasOnly 목록과 같아야 함
+SCHEMAS.notes = {
+  title: "사용내역·기록",
+  fields: [
+    { k: "title", label: "제목", max: 60, required: true, placeholder: "엄마 · 3일차 지출" },
+    { k: "body", label: "내용", type: "textarea", max: 5000, rows: 12,
+      placeholder: "아침 지엔빙 40위안\n택시 23위안 (디디)\n점심 ○○ 320위안 — 맛있었음!" },
+    { k: "done", label: "✅ 일정에 정리 완료", type: "checkbox" },
+  ],
+  hint: "여기 적은 내용은 일정에 자동으로 들어가지 않아요. 정리 담당이 보고 일정에 옮긴 뒤 '정리 완료'를 체크해요.",
+};
+
+const COLS = ["flights", "hotels", "events", "checklist", "tips", "places", "notes"];
 const CHECK_PER_PAGE = 6; // 준비물 슬라이드 한 페이지에 보여줄 개수
 
 /* =====================================================================
@@ -307,7 +320,7 @@ async function createBackend() {
  * 4. 상태 & 화면 그리기
  * ===================================================================== */
 const state = {
-  flights: [], hotels: [], events: [], checklist: [], tips: [], places: [],
+  flights: [], hotels: [], events: [], checklist: [], tips: [], places: [], notes: [],
   settings: {},
   tab: "plan",         // 화면 탭: plan(일정) / places(맛집·할거리)
   placeFilter: { district: "all", kind: "all", reserveOnly: false },
@@ -628,6 +641,47 @@ function renderTips() {
     </details>`).join("");
 }
 
+// ---------- 📝 사용내역 정리 (글로만 저장, 일정 미반영) ----------
+function renderNotes() {
+  const el = $("#list-notes");
+  if (!el) return;
+  if (!state.loaded.notes) return (el.innerHTML = skeleton(2));
+  if (state.notesDenied) {
+    return (el.innerHTML = emptyBox("🔒", "정리 탭 저장 권한이 아직 없어요",
+      "Firebase 콘솔 → Firestore → 규칙에 최신 firestore.rules 전체를 붙여넣고 '게시'한 뒤 새로고침해 주세요."));
+  }
+  if (!state.notes.length) {
+    return (el.innerHTML = emptyBox("📝", "아직 올라온 기록이 없어요",
+      "쓴 돈, 영수증 내용, 기억나는 일을 편하게 적어 주세요. 정리 담당이 보고 일정에 옮겨요.",
+      `<button class="btn btn-gold" type="button" data-action="add" data-col="notes">＋ 기록 올리기</button>`));
+  }
+  // 정리 전 것이 위, 같은 상태끼리는 최근 것이 위
+  const list = [...state.notes].sort((a, b) => Number(!!a.done) - Number(!!b.done) || tsVal(b.createdAt) - tsVal(a.createdAt));
+  const todo = list.filter((n) => !n.done).length;
+  el.innerHTML = `<p class="notes-count muted small">📥 정리 전 <b>${todo}</b>개 · ✅ 정리 완료 ${list.length - todo}개</p>` +
+    list.map((n) => `
+    <article class="card note ${n.done ? "is-done" : ""}">
+      <div class="note-head">
+        <h3 class="note-title">${esc(n.title)}</h3>
+        <button class="note-status" type="button" data-action="note-done" data-id="${esc(n.id)}"
+          aria-pressed="${!!n.done}" title="눌러서 상태 바꾸기">${n.done ? "✅ 정리 완료" : "📥 정리 전"}</button>
+      </div>
+      <div class="note-body">${esc(n.body)}</div>
+      <div class="note-foot">
+        ${byline(n)}
+        <button class="icon-btn" type="button" data-action="copy" data-text="${esc(`${n.title}\n${n.body || ""}`)}" aria-label="내용 복사">📋</button>
+        ${actions("notes", n.id)}
+      </div>
+    </article>`).join("");
+}
+
+function toggleNoteDone(id) {
+  const n = state.notes.find((x) => x.id === id);
+  if (!n) return;
+  backend.update("notes", id, { done: !n.done, updatedBy: me(), updatedAt: backend.now() }).catch(onWriteError);
+  toast(n.done ? "📥 정리 전으로 바꿨어요" : "✅ 정리 완료!");
+}
+
 // ---------- 맛집·할거리 ----------
 const votesOf = (p) => (Array.isArray(p.votes) ? p.votes : []);
 // 여행 기간 중 토·일 날짜 (혼잡 안내용)
@@ -748,6 +802,7 @@ const RENDER = {
   checklist: renderChecklist,
   tips: renderTips,
   places: renderPlaces,
+  notes: renderNotes,
 };
 function renderAll() {
   renderHeader();
@@ -1190,7 +1245,7 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const { action, col, id } = btn.dataset;
-  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed", "vote", "to-schedule"];
+  const needsBackend = ["add", "edit", "delete", "sample", "clear-sample", "seed", "vote", "to-schedule", "note-done"];
   if (needsBackend.includes(action) && !backend) return toast("연결 중이에요. 잠시만요…");
 
   switch (action) {
@@ -1214,6 +1269,7 @@ document.addEventListener("click", (e) => {
     case "close-form": $("#formDialog").close(); break;
     case "tab": setTab(btn.dataset.tab); break;
     case "vote": toggleVote(id); break;
+    case "note-done": toggleNoteDone(id); break;
     case "to-schedule": openScheduleForm(id); break;
     case "search": openSearch(); break;
     case "close-search": $("#searchDialog").close(); break;
@@ -1248,23 +1304,22 @@ document.addEventListener("change", (e) => {
 /* ---------- 화면 탭 (일정 / 맛집·할거리) ----------
  *  - 같은 페이지에서 보이기/숨기기만 바꿈 (헤더·모달·토스트는 공유)
  *  - 고른 탭은 localStorage에 기억, 주소 끝 #places 로도 바로 열 수 있음 */
-const TABS = ["plan", "places"];
+const TABS = ["plan", "places", "notes"];
 function setTab(tab, { keepHash = false } = {}) {
   if (!TABS.includes(tab)) tab = "plan";
   const changed = state.tab !== tab;
   state.tab = tab;
   ls.set(LS_KEY.tab, tab);
-  $("#tab-plan").hidden = tab !== "plan";
-  $("#tab-places").hidden = tab !== "places";
+  TABS.forEach((t) => ($(`#tab-${t}`).hidden = tab !== t));
   $(".quicknav").hidden = tab !== "plan"; // 섹션 바로가기는 일정 탭에서만
   document.querySelectorAll(".tab-btn").forEach((b) => {
     const on = b.dataset.tab === tab;
     b.classList.toggle("active", on);
     b.setAttribute("aria-selected", on);
   });
-  // 주소창 해시: 맛집 탭이면 #places, 일정 탭이면 지움 (기록은 쌓지 않음)
+  // 주소창 해시: 맛집 탭이면 #places, 정리 탭이면 #notes, 일정 탭이면 지움 (기록은 쌓지 않음)
   if (!keepHash) {
-    const url = location.pathname + location.search + (tab === "places" ? "#places" : "");
+    const url = location.pathname + location.search + (tab === "plan" ? "" : `#${tab}`);
     if (location.href.replace(location.origin, "") !== url) history.replaceState(null, "", url);
   }
   // 아래로 내려가 있었다면 탭 막대 바로 아래(새 탭의 맨 위)로 올려 줌
@@ -1273,9 +1328,10 @@ function setTab(tab, { keepHash = false } = {}) {
     if (window.scrollY > top) window.scrollTo({ top, behavior: "auto" });
   }
 }
-const initialTab = () => (location.hash === "#places" ? "places" : location.hash.startsWith("#sec-") ? "plan" : ls.get(LS_KEY.tab) || "plan");
+const hashTab = () => TABS.find((t) => t !== "plan" && location.hash === `#${t}`);
+const initialTab = () => hashTab() || (location.hash.startsWith("#sec-") ? "plan" : ls.get(LS_KEY.tab) || "plan");
 window.addEventListener("hashchange", () => {
-  if (location.hash === "#places") setTab("places");
+  if (hashTab()) setTab(hashTab());
   else if (location.hash.startsWith("#sec-") && state.tab !== "plan") {
     setTab("plan", { keepHash: true });
     $(location.hash)?.scrollIntoView();
@@ -1289,7 +1345,7 @@ window.addEventListener("hashchange", () => {
  *  - 결과를 누르면 해당 탭·날짜·페이지로 이동해서 카드를 잠깐 반짝여 줌 */
 const SEARCH_SECTIONS = {
   events: "🗓️ 일정", places: "🍜 맛집·할거리", flights: "✈️ 항공편",
-  hotels: "🏨 숙소", checklist: "✅ 준비물", tips: "💡 정보",
+  hotels: "🏨 숙소", checklist: "✅ 준비물", tips: "💡 정보", notes: "📝 정리",
 };
 const SEARCH_SUGGEST = ["예약", "와이탄", "지엔빙", "여권", "알리페이", "공항"];
 const SEARCH_MAX = 30; // 한 구역에 보여줄 최대 결과 수
@@ -1327,6 +1383,7 @@ function searchDocs() {
     [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
   state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
   state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
+  state.notes.forEach((n) => add("notes", n, n.title, n.done ? "✅ 정리 완료" : "📥 정리 전", [n.body, n.author]));
   return docs;
 }
 
@@ -1398,7 +1455,7 @@ const findCard = (col, id) =>
 
 function goToResult(col, id) {
   $("#searchDialog").close();
-  setTab(col === "places" ? "places" : "plan");
+  setTab(col === "places" || col === "notes" ? col : "plan");
   if (col === "events") {
     const ev = state.events.find((x) => x.id === id);
     if (ev?.date) { state.day = ev.date; ls.set(LS_KEY.day, ev.date); renderSchedule(true); }
@@ -1553,6 +1610,15 @@ function onPlacesError(err) {
   renderPlaces();
 }
 
+// 정리 탭만 권한 오류 = notes 규칙을 아직 게시 안 한 경우 → 정리 탭에만 안내
+function onNotesError(err) {
+  if (err?.code !== "permission-denied") return onListenError(err);
+  console.error(err);
+  state.loaded.notes = true;
+  state.notesDenied = true;
+  renderNotes();
+}
+
 /* ---------- 화면 테마: 자동(폰 설정 따라감) → 라이트 → 다크 순서로 바뀜 ---------- */
 const THEME_KEY = "trip.theme"; // index.html 머리의 작은 스크립트와 같은 키
 const THEMES = { auto: "🌓 자동", light: "☀️ 라이트", dark: "🌙 다크" };
@@ -1615,7 +1681,7 @@ async function boot() {
       if (col === "events" && backend.mode === "firebase") {
         setSync(meta.fromCache ? "🟡 오프라인 · 저장된 내용 표시 중" : "🟢 실시간 동기화");
       }
-    }, col === "places" ? onPlacesError : onListenError);
+    }, col === "places" ? onPlacesError : col === "notes" ? onNotesError : onListenError);
   }
   backend.subscribeSettings((s) => {
     state.settings = s || {};

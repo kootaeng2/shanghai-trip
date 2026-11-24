@@ -134,6 +134,15 @@ service cloud.firestore {
         && metaOk(d);
     }
 
+    // ---- 📝 사용내역 정리 (notes): 가족이 글로 올리는 기록, 일정에는 자동 반영 안 됨 ----
+    // ⚠️ hasOnly 목록 = app.js 의 SCHEMAS.notes 필드 + 공통 메타
+    function validNote(d) {
+      return d.keys().hasOnly(['title', 'body', 'done',
+                               'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
+        && reqStr(d, 'title', 60) && optStr(d, 'body', 5000) && optBool(d, 'done')
+        && metaOk(d);
+    }
+
     // settings/main 문서 하나만: 환율
     function validSettings(d) {
       return d.keys().hasOnly(['exchangeRate', 'updatedBy', 'updatedAt'])
@@ -149,18 +158,19 @@ service cloud.firestore {
           || (col == 'checklist' && validChecklist(d))
           || (col == 'tips'      && validTip(d))
           || (col == 'places'    && validPlace(d))
+          || (col == 'notes'     && validNote(d))
           || (col == 'settings'  && docId == 'main' && validSettings(d));
     }
 
     // ---------------- 접근 규칙 ----------------
     match /trips/{trip}/{col}/{docId} {
       allow read:   if trip == tripId()
-                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places', 'settings'];
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places', 'notes', 'settings'];
       // request.resource.data = 쓰기 후의 문서 전체 (update 시 기존 값과 합쳐진 결과)
       allow create, update: if trip == tripId() && validDoc(col, docId, request.resource.data);
       // settings 문서는 삭제 불가
       allow delete: if trip == tripId()
-                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places'];
+                    && col in ['flights', 'hotels', 'events', 'checklist', 'tips', 'places', 'notes'];
     }
 
     // 위에 해당하지 않는 모든 경로는 자동으로 거부됩니다 (trips/{trip} 문서 자체 포함)

@@ -615,7 +615,9 @@ html { scroll-padding-top: 116px; } /* 고정 막대(탭+바로가기) 높이만
 /* =====================================================================
  * 🔍 통합 검색 (v10 추가)
  * ===================================================================== */
-.tabbar { grid-template-columns: 1fr 1fr 48px; }
+.tabbar { grid-template-columns: 1fr 1.3fr 1fr 44px; }
+.tab-btn { white-space: nowrap; padding: 0 6px; }
+@media (max-width: 380px) { .tab-btn { font-size: 14px; } }
 .search-btn { padding: 0; font-size: 18px; }
 
 /* 폰: 화면 위쪽에 붙는 시트 (아래쪽이면 키보드에 가려서) / 넓은 화면: 가운데 카드 */
@@ -683,3 +685,18 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 
 /* 메모 안 "· " 줄 = 세부 내역 (작고 연하게) */
 .memo-sub { font-size: .78em; color: var(--muted); }
+
+/* 📝 사용내역 정리 탭 */
+.notes-count { margin: 0 0 4px; }
+.note { padding: 12px 14px 8px; }
+.note.is-done { opacity: .72; }
+.note-head { display: flex; align-items: flex-start; gap: 8px; }
+.note-title { flex: 1; margin: 0; font-size: 18px; font-weight: 800; }
+.note-status {
+  flex: none; border: 1px solid var(--line); background: var(--surface-2); color: inherit;
+  border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.note-body { margin-top: 8px; white-space: pre-wrap; word-break: break-word; font-size: 16px; line-height: 1.55; }
+.note-foot { display: flex; align-items: center; gap: 2px; margin-top: 8px; }
+.note-foot .byline { margin: 0; flex: 1; }
+.note.is-done .note-status { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
