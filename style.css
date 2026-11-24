@@ -680,3 +680,6 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   margin-top: 6px; padding: 5px 10px; border-radius: 10px;
   font-size: 18px; line-height: 1.45;
 }
+
+/* 메모 안 "· " 줄 = 세부 내역 (작고 연하게) */
+.memo-sub { font-size: .78em; color: var(--muted); }

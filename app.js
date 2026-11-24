@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=17";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=20";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -338,7 +338,9 @@ function byline(item) {
   const edited = item.updatedBy && item.updatedBy !== item.author ? ` · 수정 ${esc(item.updatedBy)}` : "";
   return `<div class="byline">✍️ ${esc(item.author || "익명")}${edited}</div>`;
 }
-const memo = (text) => (text ? `<p class="memo">${esc(text)}</p>` : "");
+// 메모에서 "· "로 시작하는 줄은 작은 글씨 (예: 아침 내역 "· 지엔빙 71위안")
+const memoLine = (l) => (l.startsWith("· ") ? `<span class="memo-sub">${esc(l)}</span>` : esc(l));
+const memo = (text) => (text ? `<p class="memo">${String(text).split("\n").map(memoLine).join("\n")}</p>` : "");
 // 기본 지도(고덕) 링크 + 보조 지도(구글) 작은 링크
 const mapLink = (q) => {
   if (!q) return "";
