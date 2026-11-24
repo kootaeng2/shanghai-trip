@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=22";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=23";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -698,12 +698,12 @@ function renderNotes() {
   const chip = (v, label, list) => `<button class="fchip ${state.noteDay === v ? "active" : ""}" type="button"
     data-action="note-day" data-day="${v}" aria-pressed="${state.noteDay === v}">${label}${list.length ? ` <small>${list.length}</small>` : ""}</button>`;
   const chips = chip("all", "전체", all) +
-    days.map((d, i) => chip(d, `${i + 1}일차`, all.filter((n) => n.date === d))).join("");
+    days.map((d) => chip(d, fmtMD(d), all.filter((n) => n.date === d))).join("");
   const rows = state.noteDay === "all" ? all : all.filter((n) => n.date === state.noteDay);
   const sum = sumOf(rows);
 
   el.innerHTML = `
-    <div class="place-filters note-days">${chips}</div>
+    <div class="fchips note-days">${chips}</div>
     <div class="sheet-wrap">
       <table class="sheet">
         <thead><tr>${NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("")}<th class="c-done" title="일정에 반영함">반영</th><th class="c-del"></th></tr></thead>

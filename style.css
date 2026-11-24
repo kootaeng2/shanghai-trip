@@ -687,13 +687,13 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .memo-sub { font-size: .78em; color: var(--muted); }
 
 /* 📝 사용내역 정리 탭: 엑셀처럼 칸을 눌러 바로 고치는 표 */
-.note-days { margin-bottom: 8px; }
+.note-days { margin-bottom: 10px; }
 .note-days small { opacity: .7; font-weight: 600; }
 .sheet-wrap {
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
 }
-.sheet { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 15px; }
+.sheet { border-collapse: collapse; width: 100%; min-width: 780px; table-layout: fixed; font-size: 15px; }
 .sheet th, .sheet td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; text-align: left; }
 .sheet th:last-child, .sheet td:last-child { border-right: 0; }
 .sheet thead th {
@@ -706,9 +706,10 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 }
 .sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
 .sheet input[type="checkbox"].cell { width: 20px; min-height: 20px; margin: 0 auto; display: block; accent-color: var(--ok); }
-.sheet .c-date { width: 86px; }
-.sheet .c-time { width: 96px; }
+.sheet .c-date { width: 112px; }
+.sheet .c-time { width: 124px; }
 .sheet .c-place { width: 130px; }
+.sheet .c-rating { width: auto; min-width: 150px; }
 .sheet .c-item { width: 150px; }
 .sheet .c-amount { width: 92px; }
 .sheet td.c-amount .cell { text-align: right; }
