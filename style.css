@@ -709,7 +709,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .sheet .w-date { width: 100px; }
 .sheet .w-place { width: 110px; }
 .sheet .w-item { width: 150px; }
-.sheet .w-amount { width: 80px; }
+.sheet .w-amount { width: 64px; }
 .sheet .w-payer { width: 84px; }
 .sheet .w-rating { width: auto; }
 .sheet .w-done { width: 48px; }

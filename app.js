@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=25";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=30";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -671,7 +671,8 @@ function noteCell(n, c) {
   }
   if (c.type === "time") return `<input type="time" ${base} value="${esc(v || "")}">`;
   if (c.type === "number") {
-    return `<input type="number" inputmode="decimal" step="0.01" min="0" ${base} value="${v ? esc(v) : ""}" placeholder="0">`;
+    // type=number 는 ▲▼ 버튼·휠로 값이 바뀌어서 글자 칸 + 숫자 키패드로
+    return `<input type="text" inputmode="decimal" ${base} value="${v ? esc(v) : ""}" placeholder="0">`;
   }
   return `<input type="text" ${base} maxlength="${c.max}" value="${esc(v || "")}" placeholder="${esc(c.ph)}">`;
 }
@@ -691,7 +692,8 @@ function renderNotes() {
   }
   notesPending = false;
 
-  const all = [...state.notes].sort(noteSort);
+  // 최근에 추가한 줄이 맨 위 (＋ 추가하면 위로 쌓임)
+  const all = [...state.notes].sort((a, b) => tsVal(b.createdAt) - tsVal(a.createdAt));
   const rows = all;
   const sum = rows.reduce((s, n) => s + (Number(n.amount) || 0), 0);
   const heads = NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("");
@@ -726,7 +728,8 @@ function saveNoteCell(input) {
   let v;
   if (k === "done") v = input.checked;
   else if (k === "amount") {
-    v = Math.max(0, Math.round((Number(input.value) || 0) * 100) / 100);
+    v = Math.max(0, Math.round((Number(String(input.value).replace(/[^0-9.]/g, "")) || 0) * 100) / 100);
+    input.value = v || "";
   } else v = input.value.trim().slice(0, Number(input.maxLength) > 0 ? Number(input.maxLength) : 300);
   if ((n[k] ?? (k === "amount" ? 0 : k === "done" ? false : "")) === v) return;
   if (k === "done") input.closest("tr")?.classList.toggle("is-done", v);
