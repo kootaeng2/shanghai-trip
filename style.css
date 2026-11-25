@@ -691,7 +691,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
 }
-.sheet { border-collapse: collapse; width: 100%; min-width: 820px; table-layout: fixed; font-size: 15px; }
+.sheet { border-collapse: collapse; width: 100%; min-width: 900px; table-layout: fixed; font-size: 15px; }
 .sheet th, .sheet td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; text-align: center; }
 .sheet th:last-child, .sheet td:last-child { border-right: 0; }
 .sheet thead th {
@@ -709,7 +709,8 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .sheet .w-date { width: 100px; }
 .sheet .w-place { width: 110px; }
 .sheet .w-item { width: 150px; }
-.sheet .w-amount { width: 64px; }
+.sheet .w-amount { width: 96px; }
+.sheet .w-currency { width: 80px; }
 .sheet .w-payer { width: 84px; }
 .sheet .w-rating { width: auto; }
 .sheet .w-done { width: 48px; }
@@ -723,3 +724,6 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .sheet tfoot .c-amount { text-align: center; color: var(--red); white-space: nowrap; }
 .sheet-empty { padding: 18px 12px !important; color: var(--muted); text-align: center !important; }
 .sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+.sheet tfoot tr + tr th { border-top: 1px solid var(--line); }
+.sheet tfoot .muted { font-weight: 600; font-size: 13px; }
+.sheet .sheet-total th { color: var(--red); font-size: 16px; }

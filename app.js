@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=30";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=31";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -195,13 +195,15 @@ const SCHEMAS = {
   },
 };
 
-// 📝 정리(경비): 엑셀처럼 한 줄 = 한 건 (일시·장소·내역·금액·결제자·비고). 일정에는 자동 반영 안 됨
+// 📝 정리(경비): 엑셀처럼 한 줄 = 한 건 (일시·장소·내역·금액·단위·결제자·비고). 일정에는 자동 반영 안 됨
+// 단위(currency): CNY(위안) / KRW(원). 숙박·항공권처럼 원으로 낸 것도 같이 적으려고. 없으면 CNY
 // ⚠️ 필드 + 공통 메타가 firestore.rules validNote 의 hasOnly 목록과 같아야 함
 const NOTE_COLS = [
   { k: "date", label: "일시", type: "day" },   // 날짜만 (시간 칸은 뺌. 예전 줄의 time 값은 정렬에만 쓰임)
   { k: "place", label: "장소", max: 100, ph: "예원" },
   { k: "item", label: "내역", max: 100, ph: "토끼사탕" },
-  { k: "amount", label: "금액(¥)", type: "number" },
+  { k: "amount", label: "금액", type: "number" },
+  { k: "currency", label: "단위", type: "cur" },
   { k: "payer", label: "결제자", max: 30, ph: "아빠" },
   { k: "rating", label: "비고", max: 300, ph: "맛있음 👍" }, // 필드명은 예전 그대로(rating), 화면 이름만 비고
 ];
@@ -211,7 +213,8 @@ SCHEMAS.notes = {
     { k: "date", label: "날짜", type: "date" },
     { k: "place", label: "장소", max: 100 },
     { k: "item", label: "내역", max: 100 },
-    { k: "amount", label: "금액 (CNY)", type: "number", max: 10000000, half: true },
+    { k: "amount", label: "금액", type: "number", max: 100000000, half: true },
+    { k: "currency", label: "단위", type: "select", half: true, options: [["CNY", "¥ 위안"], ["KRW", "₩ 원"]] },
     { k: "payer", label: "결제자", max: 30, half: true },
     { k: "rating", label: "비고", type: "textarea", max: 300 },
     { k: "done", label: "✅ 일정에 반영함", type: "checkbox" },
@@ -660,6 +663,9 @@ const noteSort = (a, b) => `${a.date || "9"}${a.time || "99"}`.localeCompare(`${
   || tsVal(a.createdAt) - tsVal(b.createdAt);
 const fmtCny = (n) => (Math.round(n * 100) / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
 
+const CURS = { CNY: "¥ 위안", KRW: "₩ 원" };
+const noteCur = (n) => (n.currency === "KRW" ? "KRW" : "CNY");
+
 function noteCell(n, c) {
   const v = n[c.k];
   const base = `class="cell" data-note="${esc(n.id)}" data-k="${c.k}" aria-label="${c.label}"`;
@@ -670,9 +676,13 @@ function noteCell(n, c) {
     return `<select ${base}>${opts.map(([val, t]) => `<option value="${val}" ${val === (v || "") ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
   }
   if (c.type === "time") return `<input type="time" ${base} value="${esc(v || "")}">`;
+  if (c.type === "cur") {
+    const cur = noteCur(n);
+    return `<select ${base}>${Object.entries(CURS).map(([k, t]) => `<option value="${k}" ${k === cur ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  }
   if (c.type === "number") {
     // type=number 는 ▲▼ 버튼·휠로 값이 바뀌어서 글자 칸 + 숫자 키패드로
-    return `<input type="text" inputmode="decimal" ${base} value="${v ? esc(v) : ""}" placeholder="0">`;
+    return `<input type="text" inputmode="decimal" ${base} value="${v ? esc(fmtCny(v)) : ""}" placeholder="0">`;
   }
   return `<input type="text" ${base} maxlength="${c.max}" value="${esc(v || "")}" placeholder="${esc(c.ph)}">`;
 }
@@ -695,7 +705,10 @@ function renderNotes() {
   // 최근에 추가한 줄이 맨 위 (＋ 추가하면 위로 쌓임)
   const all = [...state.notes].sort((a, b) => tsVal(b.createdAt) - tsVal(a.createdAt));
   const rows = all;
-  const sum = rows.reduce((s, n) => s + (Number(n.amount) || 0), 0);
+  const sumCur = (cur) => rows.filter((n) => noteCur(n) === cur).reduce((s, n) => s + (Number(n.amount) || 0), 0);
+  const cny = sumCur("CNY");
+  const won = sumCur("KRW");
+  const total = cny * currentRate() + won; // 전부 원으로 환산
   const heads = NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("");
 
   el.innerHTML = `
@@ -710,7 +723,11 @@ function renderNotes() {
             <td class="c-del"><button class="icon-btn" type="button" data-action="delete" data-col="notes" data-id="${esc(n.id)}" aria-label="이 줄 삭제">🗑️</button></td>
           </tr>`).join("") : `<tr><td colspan="${NOTE_COLS.length + 2}" class="sheet-empty">아직 적은 내역이 없어요. 아래 <b>＋ 한 줄 추가</b>를 눌러 주세요.</td></tr>`}
         </tbody>
-        <tfoot><tr><th colspan="3">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="4" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
+        <tfoot>
+          <tr><th colspan="3" rowspan="3">합계 ${rows.length}건</th><th colspan="2" class="c-amount">¥${fmtCny(cny)}</th><th colspan="4" class="muted">위안 사용분 ≈ ${krw(cny)}</th></tr>
+          <tr><th colspan="2" class="c-amount">₩${fmtNum(won)}</th><th colspan="4" class="muted">원으로 낸 것 (숙박·항공 등)</th></tr>
+          <tr class="sheet-total"><th colspan="2" class="c-amount">₩${fmtNum(total)}</th><th colspan="4">총 경비 (1위안 = ${fmtNum(currentRate())}원 환산)</th></tr>
+        </tfoot>
       </table>
     </div>
     <div class="sheet-actions">
@@ -729,9 +746,10 @@ function saveNoteCell(input) {
   if (k === "done") v = input.checked;
   else if (k === "amount") {
     v = Math.max(0, Math.round((Number(String(input.value).replace(/[^0-9.]/g, "")) || 0) * 100) / 100);
-    input.value = v || "";
+    input.value = v ? fmtCny(v) : "";
   } else v = input.value.trim().slice(0, Number(input.maxLength) > 0 ? Number(input.maxLength) : 300);
-  if ((n[k] ?? (k === "amount" ? 0 : k === "done" ? false : "")) === v) return;
+  const cur = k === "currency" ? noteCur(n) : n[k];
+  if ((cur ?? (k === "amount" ? 0 : k === "done" ? false : "")) === v) return;
   if (k === "done") input.closest("tr")?.classList.toggle("is-done", v);
   backend.update("notes", id, { [k]: v, updatedBy: me(), updatedAt: backend.now() }).catch(onWriteError);
 }
@@ -743,7 +761,7 @@ function addNoteRow() {
   const date = last?.date || (tripDays().includes(today) ? today : "");
   const id = newId();
   const now = backend.now();
-  backend.set("notes", id, { date, item: "", place: "", rating: "", amount: 0, payer: me(), done: false,
+  backend.set("notes", id, { date, item: "", place: "", rating: "", amount: 0, currency: last ? noteCur(last) : "CNY", payer: me(), done: false,
     author: me(), updatedBy: me(), createdAt: now, updatedAt: now }).catch(onWriteError);
   // 화면에 새 줄이 생기면 '장소' 칸에 커서
   setTimeout(() => {
@@ -756,8 +774,8 @@ function addNoteRow() {
 function copyNotesTable() {
   const rows = [...state.notes].sort(noteSort);
   const clean = (s) => String(s ?? "").replace(/[\t\n]+/g, " ");
-  const lines = [["일시", "장소", "내역", "금액(위안)", "결제자", "비고", "반영"].join("\t"),
-    ...rows.map((n) => [n.date, n.place, n.item, n.amount || 0, n.payer, n.rating, n.done ? "O" : ""]
+  const lines = [["일시", "장소", "내역", "금액", "단위", "결제자", "비고", "반영"].join("\t"),
+    ...rows.map((n) => [n.date, n.place, n.item, n.amount || 0, noteCur(n) === "KRW" ? "원" : "위안", n.payer, n.rating, n.done ? "O" : ""]
       .map(clean).join("\t"))];
   copyText(lines.join("\n"));
 }
@@ -1480,7 +1498,7 @@ function searchDocs() {
     [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
   state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
   state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
-  state.notes.forEach((n) => add("notes", n, n.item || n.place || "경비", [fmtMD(n.date), n.place, n.amount ? `¥${n.amount}` : "", n.payer].filter(Boolean).join(" · "), [n.rating, n.author]));
+  state.notes.forEach((n) => add("notes", n, n.item || n.place || "경비", [fmtMD(n.date), n.place, n.amount ? `${noteCur(n) === "KRW" ? "₩" : "¥"}${n.amount}` : "", n.payer].filter(Boolean).join(" · "), [n.rating, n.author]));
   return docs;
 }
 

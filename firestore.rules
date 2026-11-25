@@ -137,11 +137,12 @@ service cloud.firestore {
     // ---- 📝 정리(경비) (notes): 엑셀처럼 한 줄 = 한 건 (rating = 화면의 '비고'), 일정에는 자동 반영 안 됨 ----
     // ⚠️ hasOnly 목록 = app.js 의 NOTE_COLS + done + 공통 메타
     function validNote(d) {
-      return d.keys().hasOnly(['date', 'time', 'place', 'item', 'amount', 'payer', 'rating', 'done',
+      return d.keys().hasOnly(['date', 'time', 'place', 'item', 'amount', 'currency', 'payer', 'rating', 'done',
                                'author', 'updatedBy', 'createdAt', 'updatedAt', 'sample'])
         && optDate(d, 'date') && optTime(d, 'time')
         && optStr(d, 'place', 100) && optStr(d, 'item', 100)
-        && optNum(d, 'amount', 10000000) && optStr(d, 'payer', 30) && optStr(d, 'rating', 300) && optBool(d, 'done')
+        && optNum(d, 'amount', 100000000) && (!('currency' in d) || d.currency in ['CNY', 'KRW'])
+        && optStr(d, 'payer', 30) && optStr(d, 'rating', 300) && optBool(d, 'done')
         && metaOk(d);
     }
 
