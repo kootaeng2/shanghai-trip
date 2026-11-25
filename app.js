@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=23";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=24";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -195,26 +195,28 @@ const SCHEMAS = {
   },
 };
 
-// 📝 사용내역 정리: 엑셀처럼 한 줄 = 한 건 (언제·어디서·무엇을·얼마·평가). 일정에는 자동 반영 안 됨
+// 📝 정리(경비): 엑셀처럼 한 줄 = 한 건 (일시·장소·내역·금액·결제자·비고). 일정에는 자동 반영 안 됨
 // ⚠️ 필드 + 공통 메타가 firestore.rules validNote 의 hasOnly 목록과 같아야 함
 const NOTE_COLS = [
-  { k: "date", label: "언제", type: "day" },
+  { k: "date", label: "일시", type: "day" },   // 날짜+시간 두 칸을 머리글 '일시' 하나로 묶음
   { k: "time", label: "시간", type: "time" },
-  { k: "place", label: "어디서", max: 100, ph: "예원" },
-  { k: "item", label: "무엇을", max: 100, ph: "토끼사탕" },
-  { k: "amount", label: "얼마(¥)", type: "number" },
-  { k: "rating", label: "평가", max: 300, ph: "맛있음 👍" },
+  { k: "place", label: "장소", max: 100, ph: "예원" },
+  { k: "item", label: "내역", max: 100, ph: "토끼사탕" },
+  { k: "amount", label: "금액(¥)", type: "number" },
+  { k: "payer", label: "결제자", max: 30, ph: "아빠" },
+  { k: "rating", label: "비고", max: 300, ph: "맛있음 👍" }, // 필드명은 예전 그대로(rating), 화면 이름만 비고
 ];
 SCHEMAS.notes = {
   title: "사용내역",
   fields: [
-    { k: "date", label: "언제", type: "date", half: true },
+    { k: "date", label: "날짜", type: "date", half: true },
     { k: "time", label: "시간", type: "time", half: true },
-    { k: "place", label: "어디서", max: 100 },
-    { k: "item", label: "무엇을", max: 100 },
-    { k: "amount", label: "얼마 (CNY)", type: "number", max: 10000000, half: true },
-    { k: "done", label: "✅ 일정에 반영함", type: "checkbox", half: true },
-    { k: "rating", label: "평가", type: "textarea", max: 300 },
+    { k: "place", label: "장소", max: 100 },
+    { k: "item", label: "내역", max: 100 },
+    { k: "amount", label: "금액 (CNY)", type: "number", max: 10000000, half: true },
+    { k: "payer", label: "결제자", max: 30, half: true },
+    { k: "rating", label: "비고", type: "textarea", max: 300 },
+    { k: "done", label: "✅ 일정에 반영함", type: "checkbox" },
   ],
 };
 
@@ -654,7 +656,6 @@ function renderTips() {
 // ---------- 📝 사용내역 표 (엑셀처럼 칸을 눌러 바로 고침, 일정 미반영) ----------
 //  - 칸에서 빠져나오면(change) 그 칸만 저장 → 가족이 동시에 다른 줄을 고쳐도 안 덮어씀
 //  - 내가 칸에 입력 중일 때 남의 수정이 오면, 입력이 끝난 뒤에 다시 그림 (커서 안 날아가게)
-state.noteDay = "all";
 let notesPending = false;
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const noteSort = (a, b) => `${a.date || "9"}${a.time || "99"}`.localeCompare(`${b.date || "9"}${b.time || "99"}`)
@@ -693,20 +694,17 @@ function renderNotes() {
   notesPending = false;
 
   const all = [...state.notes].sort(noteSort);
-  const days = tripDays();
-  const sumOf = (list) => list.reduce((s, n) => s + (Number(n.amount) || 0), 0);
-  const chip = (v, label, list) => `<button class="fchip ${state.noteDay === v ? "active" : ""}" type="button"
-    data-action="note-day" data-day="${v}" aria-pressed="${state.noteDay === v}">${label}${list.length ? ` <small>${list.length}</small>` : ""}</button>`;
-  const chips = chip("all", "전체", all) +
-    days.map((d) => chip(d, fmtMD(d), all.filter((n) => n.date === d))).join("");
-  const rows = state.noteDay === "all" ? all : all.filter((n) => n.date === state.noteDay);
-  const sum = sumOf(rows);
+  const rows = all;
+  const sum = rows.reduce((s, n) => s + (Number(n.amount) || 0), 0);
+  // 머리글: 날짜·시간 두 칸 위에 '일시' 하나
+  const heads = NOTE_COLS.filter((c) => c.k !== "time")
+    .map((c) => `<th class="c-${c.k}" ${c.k === "date" ? 'colspan="2"' : ""}>${c.label}</th>`).join("");
 
   el.innerHTML = `
-    <div class="fchips note-days">${chips}</div>
     <div class="sheet-wrap">
       <table class="sheet">
-        <thead><tr>${NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("")}<th class="c-done" title="일정에 반영함">반영</th><th class="c-del"></th></tr></thead>
+        <colgroup>${NOTE_COLS.map((c) => `<col class="w-${c.k}">`).join("")}<col class="w-done"><col class="w-del"></colgroup>
+        <thead><tr>${heads}<th class="c-done" title="일정에 반영함">반영</th><th class="c-del"></th></tr></thead>
         <tbody>${rows.length ? rows.map((n) => `
           <tr class="${n.done ? "is-done" : ""}" data-row="${esc(n.id)}" title="✍️ ${esc(n.author || "")}${n.updatedBy && n.updatedBy !== n.author ? ` · 수정 ${esc(n.updatedBy)}` : ""}">
             ${NOTE_COLS.map((c) => `<td class="c-${c.k}">${noteCell(n, c)}</td>`).join("")}
@@ -714,7 +712,7 @@ function renderNotes() {
             <td class="c-del"><button class="icon-btn" type="button" data-action="delete" data-col="notes" data-id="${esc(n.id)}" aria-label="이 줄 삭제">🗑️</button></td>
           </tr>`).join("") : `<tr><td colspan="${NOTE_COLS.length + 2}" class="sheet-empty">아직 적은 내역이 없어요. 아래 <b>＋ 한 줄 추가</b>를 눌러 주세요.</td></tr>`}
         </tbody>
-        <tfoot><tr><th colspan="4">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="3" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
+        <tfoot><tr><th colspan="4">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="4" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
       </table>
     </div>
     <div class="sheet-actions">
@@ -740,14 +738,15 @@ function saveNoteCell(input) {
 }
 
 function addNoteRow() {
-  const days = tripDays();
+  // 날짜는 마지막으로 적은 줄과 같은 날(이어서 적기 편하게), 없으면 오늘이 여행 중일 때 오늘
+  const last = [...state.notes].sort((a, b) => tsVal(b.createdAt) - tsVal(a.createdAt))[0];
   const today = todayYMD();
-  const date = state.noteDay !== "all" ? state.noteDay : days.includes(today) ? today : "";
+  const date = last?.date || (tripDays().includes(today) ? today : "");
   const id = newId();
   const now = backend.now();
-  backend.set("notes", id, { date, item: "", place: "", rating: "", amount: 0, done: false,
+  backend.set("notes", id, { date, item: "", place: "", rating: "", amount: 0, payer: me(), done: false,
     author: me(), updatedBy: me(), createdAt: now, updatedAt: now }).catch(onWriteError);
-  // 화면에 새 줄이 생기면 '어디서' 칸에 커서
+  // 화면에 새 줄이 생기면 '장소' 칸에 커서
   setTimeout(() => {
     const cell = document.querySelector(`.cell[data-note="${CSS.escape(id)}"][data-k="place"]`);
     if (cell) { cell.scrollIntoView({ block: "nearest", inline: "start" }); cell.focus(); }
@@ -756,11 +755,11 @@ function addNoteRow() {
 
 // 표 전체를 탭으로 구분한 글로 복사 → 엑셀·구글시트에 그대로 붙여넣기
 function copyNotesTable() {
-  const rows = [...state.notes].sort(noteSort)
-    .filter((n) => state.noteDay === "all" || n.date === state.noteDay);
+  const rows = [...state.notes].sort(noteSort);
   const clean = (s) => String(s ?? "").replace(/[\t\n]+/g, " ");
-  const lines = [["날짜", "시간", "어디서", "무엇을", "금액(위안)", "평가", "반영", "작성"].join("\t"),
-    ...rows.map((n) => [n.date, n.time, n.place, n.item, n.amount || 0, n.rating, n.done ? "O" : "", n.author].map(clean).join("\t"))];
+  const lines = [["일시", "장소", "내역", "금액(위안)", "결제자", "비고", "반영"].join("\t"),
+    ...rows.map((n) => [[n.date, n.time].filter(Boolean).join(" "), n.place, n.item, n.amount || 0, n.payer, n.rating, n.done ? "O" : ""]
+      .map(clean).join("\t"))];
   copyText(lines.join("\n"));
 }
 
@@ -1369,7 +1368,6 @@ document.addEventListener("click", (e) => {
     case "vote": toggleVote(id); break;
     case "note-add": addNoteRow(); break;
     case "note-copy": copyNotesTable(); break;
-    case "note-day": state.noteDay = btn.dataset.day; renderNotes(); break;
     case "to-schedule": openScheduleForm(id); break;
     case "search": openSearch(); break;
     case "close-search": $("#searchDialog").close(); break;
@@ -1445,7 +1443,7 @@ window.addEventListener("hashchange", () => {
  *  - 결과를 누르면 해당 탭·날짜·페이지로 이동해서 카드를 잠깐 반짝여 줌 */
 const SEARCH_SECTIONS = {
   events: "🗓️ 일정", places: "🍜 맛집·할거리", flights: "✈️ 항공편",
-  hotels: "🏨 숙소", checklist: "✅ 준비물", tips: "💡 정보", notes: "📝 정리",
+  hotels: "🏨 숙소", checklist: "✅ 준비물", tips: "💡 정보", notes: "📝 정리(경비)",
 };
 const SEARCH_SUGGEST = ["예약", "와이탄", "지엔빙", "여권", "알리페이", "공항"];
 const SEARCH_MAX = 30; // 한 구역에 보여줄 최대 결과 수
@@ -1483,7 +1481,7 @@ function searchDocs() {
     [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
   state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
   state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
-  state.notes.forEach((n) => add("notes", n, n.item || n.place || "사용내역", [fmtMD(n.date), n.time, n.place, n.amount ? `¥${n.amount}` : ""].filter(Boolean).join(" · "), [n.rating, n.author]));
+  state.notes.forEach((n) => add("notes", n, n.item || n.place || "경비", [fmtMD(n.date), n.time, n.place, n.amount ? `¥${n.amount}` : "", n.payer].filter(Boolean).join(" · "), [n.rating, n.author]));
   return docs;
 }
 

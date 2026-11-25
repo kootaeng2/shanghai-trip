@@ -686,14 +686,12 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 /* 메모 안 "· " 줄 = 세부 내역 (작고 연하게) */
 .memo-sub { font-size: .78em; color: var(--muted); }
 
-/* 📝 사용내역 정리 탭: 엑셀처럼 칸을 눌러 바로 고치는 표 */
-.note-days { margin-bottom: 10px; }
-.note-days small { opacity: .7; font-weight: 600; }
+/* 📝 정리(경비) 탭: 엑셀처럼 칸을 눌러 바로 고치는 표 */
 .sheet-wrap {
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
 }
-.sheet { border-collapse: collapse; width: 100%; min-width: 780px; table-layout: fixed; font-size: 15px; }
+.sheet { border-collapse: collapse; width: 100%; min-width: 940px; table-layout: fixed; font-size: 15px; }
 .sheet th, .sheet td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; text-align: left; }
 .sheet th:last-child, .sheet td:last-child { border-right: 0; }
 .sheet thead th {
@@ -706,15 +704,19 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 }
 .sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
 .sheet input[type="checkbox"].cell { width: 20px; min-height: 20px; margin: 0 auto; display: block; accent-color: var(--ok); }
-.sheet .c-date { width: 112px; }
-.sheet .c-time { width: 124px; }
-.sheet .c-place { width: 130px; }
-.sheet .c-rating { width: auto; min-width: 150px; }
-.sheet .c-item { width: 150px; }
-.sheet .c-amount { width: 92px; }
+/* 칸 너비는 <colgroup> 으로 (머리글 '일시'가 두 칸을 묶어서) */
+.sheet .w-date { width: 112px; }
+.sheet .w-time { width: 124px; }
+.sheet .w-place { width: 130px; }
+.sheet .w-item { width: 150px; }
+.sheet .w-amount { width: 92px; }
+.sheet .w-payer { width: 84px; }
+.sheet .w-rating { width: auto; }
 .sheet td.c-amount .cell { text-align: right; }
-.sheet .c-done { width: 48px; text-align: center; }
-.sheet .c-del { width: 44px; text-align: center; }
+.sheet .w-done { width: 48px; }
+.sheet .c-done { text-align: center; }
+.sheet .w-del { width: 44px; }
+.sheet .c-del { text-align: center; }
 .sheet .c-del .icon-btn { width: 40px; height: 40px; }
 .sheet tr.is-done td { background: var(--ok-soft); }
 .sheet tr.is-done .cell { color: var(--muted); }

@@ -19,8 +19,8 @@
   </script>
 
   <!-- 캐시 문제 생기면 ?v= 숫자를 올려 주세요 (README '캐시 문제' 참고) -->
-  <link rel="stylesheet" href="style.css?v=23" />
-  <script type="module" src="app.js?v=23"></script>
+  <link rel="stylesheet" href="style.css?v=24" />
+  <script type="module" src="app.js?v=24"></script>
 </head>
 <body>
 
@@ -79,7 +79,7 @@
       <nav class="tabbar" role="tablist" aria-label="화면 전환">
         <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="plan" aria-selected="true">🗓️ 일정</button>
         <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="places" aria-selected="false">🍜 맛집·할거리</button>
-        <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="notes" aria-selected="false">📝 정리</button>
+        <button class="tab-btn" type="button" role="tab" data-action="tab" data-tab="notes" aria-selected="false">📝 정리(경비)</button>
         <!-- 통합 검색: 일정·맛집·항공·숙소·준비물·정보를 한 번에 찾기 (PC는 / 키로도 열림) -->
         <button class="tab-btn search-btn" type="button" data-action="search" aria-label="검색" title="검색 ( / )">🔍</button>
       </nav>
@@ -113,10 +113,10 @@
     <main id="tab-notes" class="container" hidden>
       <section id="sec-notes" class="section">
         <div class="section-head">
-          <h2>📝 사용내역 정리</h2>
+          <h2>📝 정리(경비)</h2>
           <button class="btn btn-add" type="button" data-action="note-add">＋ 추가</button>
         </div>
-        <p class="places-intro muted small">가족 누구나 <b>언제·어디서·무엇을·얼마·평가</b>를 한 줄씩 적어요. 일정에는 바로 들어가지 않고, 정리 담당이 확인해서 옮긴 뒤 <b>반영</b> 칸을 체크해요.</p>
+        <p class="places-intro muted small">가족 누구나 <b>일시·장소·내역·금액·결제자·비고</b>를 한 줄씩 적어요. 일정에는 바로 들어가지 않고, 정리 담당이 확인해서 옮긴 뒤 <b>반영</b> 칸을 체크해요.</p>
         <div id="list-notes" class="stack"></div>
       </section>
     </main>
