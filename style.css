@@ -699,7 +699,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   padding: 8px 8px; white-space: nowrap;
 }
 .sheet .cell {
-  width: 100%; min-height: 42px; border: 0; background: transparent; color: var(--text);
+  width: 100%; min-height: 60px; height: 60px; border: 0; background: transparent; color: var(--text);
   font: inherit; font-size: 16px; padding: 6px 8px; border-radius: 0;
 }
 .sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
