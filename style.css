@@ -703,7 +703,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   font: inherit; font-size: 16px; padding: 6px 8px; border-radius: 0;
 }
 .sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
-.sheet input[type="checkbox"].cell { width: 20px; min-height: 20px; margin: 0 auto; display: block; accent-color: var(--ok); }
+.sheet input[type="checkbox"].cell { width: 22px; height: 22px; min-height: 22px; margin: 0 auto; display: block; accent-color: var(--ok); }
 /* 칸 너비는 <colgroup> 으로 */
 .sheet .w-date { width: 112px; }
 .sheet .w-place { width: 130px; }
