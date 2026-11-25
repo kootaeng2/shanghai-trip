@@ -708,7 +708,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 .sheet .w-date { width: 112px; }
 .sheet .w-place { width: 130px; }
 .sheet .w-item { width: 150px; }
-.sheet .w-amount { width: 92px; }
+.sheet .w-amount { width: 80px; }
 .sheet .w-payer { width: 84px; }
 .sheet .w-rating { width: auto; }
 .sheet td.c-amount .cell { text-align: right; }
