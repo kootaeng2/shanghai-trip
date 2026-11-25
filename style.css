@@ -691,7 +691,7 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
 }
-.sheet { border-collapse: collapse; width: 100%; min-width: 940px; table-layout: fixed; font-size: 15px; }
+.sheet { border-collapse: collapse; width: 100%; min-width: 820px; table-layout: fixed; font-size: 15px; }
 .sheet th, .sheet td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; text-align: left; }
 .sheet th:last-child, .sheet td:last-child { border-right: 0; }
 .sheet thead th {
@@ -704,9 +704,8 @@ dialog.search-sheet[open] { animation: down .2s ease-out; }
 }
 .sheet .cell:focus { outline: 2px solid var(--gold); outline-offset: -2px; background: var(--gold-soft); color: #1f1a17; }
 .sheet input[type="checkbox"].cell { width: 20px; min-height: 20px; margin: 0 auto; display: block; accent-color: var(--ok); }
-/* 칸 너비는 <colgroup> 으로 (머리글 '일시'가 두 칸을 묶어서) */
+/* 칸 너비는 <colgroup> 으로 */
 .sheet .w-date { width: 112px; }
-.sheet .w-time { width: 124px; }
 .sheet .w-place { width: 130px; }
 .sheet .w-item { width: 150px; }
 .sheet .w-amount { width: 92px; }

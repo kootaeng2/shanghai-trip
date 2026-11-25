@@ -10,7 +10,7 @@
  *  6. 샘플 데이터
  *  7. 가족 코드·이름 입력 → 앱 시작
  * ===================================================================== */
-import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=24";
+import { firebaseConfig, TRIP_CONFIG as C } from "./firebase-config.js?v=25";
 
 const FIREBASE_VERSION = "10.12.2"; // Firebase 웹 SDK (CDN) 버전
 
@@ -198,8 +198,7 @@ const SCHEMAS = {
 // 📝 정리(경비): 엑셀처럼 한 줄 = 한 건 (일시·장소·내역·금액·결제자·비고). 일정에는 자동 반영 안 됨
 // ⚠️ 필드 + 공통 메타가 firestore.rules validNote 의 hasOnly 목록과 같아야 함
 const NOTE_COLS = [
-  { k: "date", label: "일시", type: "day" },   // 날짜+시간 두 칸을 머리글 '일시' 하나로 묶음
-  { k: "time", label: "시간", type: "time" },
+  { k: "date", label: "일시", type: "day" },   // 날짜만 (시간 칸은 뺌. 예전 줄의 time 값은 정렬에만 쓰임)
   { k: "place", label: "장소", max: 100, ph: "예원" },
   { k: "item", label: "내역", max: 100, ph: "토끼사탕" },
   { k: "amount", label: "금액(¥)", type: "number" },
@@ -209,8 +208,7 @@ const NOTE_COLS = [
 SCHEMAS.notes = {
   title: "사용내역",
   fields: [
-    { k: "date", label: "날짜", type: "date", half: true },
-    { k: "time", label: "시간", type: "time", half: true },
+    { k: "date", label: "날짜", type: "date" },
     { k: "place", label: "장소", max: 100 },
     { k: "item", label: "내역", max: 100 },
     { k: "amount", label: "금액 (CNY)", type: "number", max: 10000000, half: true },
@@ -696,9 +694,7 @@ function renderNotes() {
   const all = [...state.notes].sort(noteSort);
   const rows = all;
   const sum = rows.reduce((s, n) => s + (Number(n.amount) || 0), 0);
-  // 머리글: 날짜·시간 두 칸 위에 '일시' 하나
-  const heads = NOTE_COLS.filter((c) => c.k !== "time")
-    .map((c) => `<th class="c-${c.k}" ${c.k === "date" ? 'colspan="2"' : ""}>${c.label}</th>`).join("");
+  const heads = NOTE_COLS.map((c) => `<th class="c-${c.k}">${c.label}</th>`).join("");
 
   el.innerHTML = `
     <div class="sheet-wrap">
@@ -712,7 +708,7 @@ function renderNotes() {
             <td class="c-del"><button class="icon-btn" type="button" data-action="delete" data-col="notes" data-id="${esc(n.id)}" aria-label="이 줄 삭제">🗑️</button></td>
           </tr>`).join("") : `<tr><td colspan="${NOTE_COLS.length + 2}" class="sheet-empty">아직 적은 내역이 없어요. 아래 <b>＋ 한 줄 추가</b>를 눌러 주세요.</td></tr>`}
         </tbody>
-        <tfoot><tr><th colspan="4">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="4" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
+        <tfoot><tr><th colspan="3">합계 ${rows.length}건</th><th class="c-amount">¥${fmtCny(sum)}</th><th colspan="4" class="muted">≈ ${krw(sum)}</th></tr></tfoot>
       </table>
     </div>
     <div class="sheet-actions">
@@ -758,7 +754,7 @@ function copyNotesTable() {
   const rows = [...state.notes].sort(noteSort);
   const clean = (s) => String(s ?? "").replace(/[\t\n]+/g, " ");
   const lines = [["일시", "장소", "내역", "금액(위안)", "결제자", "비고", "반영"].join("\t"),
-    ...rows.map((n) => [[n.date, n.time].filter(Boolean).join(" "), n.place, n.item, n.amount || 0, n.payer, n.rating, n.done ? "O" : ""]
+    ...rows.map((n) => [n.date, n.place, n.item, n.amount || 0, n.payer, n.rating, n.done ? "O" : ""]
       .map(clean).join("\t"))];
   copyText(lines.join("\n"));
 }
@@ -1481,7 +1477,7 @@ function searchDocs() {
     [h.address, h.bookingRef && `예약번호 ${h.bookingRef}`, h.phone, h.memo]));
   state.checklist.forEach((c) => add("checklist", c, c.text, c.done ? "✔ 챙김" : "아직", []));
   state.tips.forEach((t) => add("tips", t, t.title, "", [t.body]));
-  state.notes.forEach((n) => add("notes", n, n.item || n.place || "경비", [fmtMD(n.date), n.time, n.place, n.amount ? `¥${n.amount}` : "", n.payer].filter(Boolean).join(" · "), [n.rating, n.author]));
+  state.notes.forEach((n) => add("notes", n, n.item || n.place || "경비", [fmtMD(n.date), n.place, n.amount ? `¥${n.amount}` : "", n.payer].filter(Boolean).join(" · "), [n.rating, n.author]));
   return docs;
 }
 
